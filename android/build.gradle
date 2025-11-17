@@ -1,0 +1,38 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  ext {
+        TargetSdkVersion = 34
+        CompileSdkVersion = 34
+        CompileSdkVersion = 21
+        rnsDefaultKotlinVersion = '1.8.0'
+  }
+  ext.safeExtGet = {prop, fallback ->
+      def props = (prop instanceof String) ? [prop] : prop
+      def result = props.find { key ->
+          return rootProject.ext.has(key)
+      }
+      return result ? rootProject.ext.get(result) : fallback
+  }
+  repositories {
+      google()
+      mavenCentral()
+  }
+  dependencies {
+      classpath('com.android.tools.build:gradle:8.2.1')
+      classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${safeExtGet('kotlinVersion', rnsDefaultKotlinVersion)}"
+      classpath "com.diffplug.spotless:spotless-plugin-gradle:6.25.0"
+      classpath "com.facebook.react:react-native-gradle-plugin"
+  }
+}
+
+allprojects {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"
