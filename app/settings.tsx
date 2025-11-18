@@ -4,6 +4,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
+import { initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
@@ -11,17 +13,26 @@ import React, { useEffect, useState } from "react";
 import { Alert, Button, StyleSheet } from "react-native";
 
 export default function Settings() {
-  const [loading, setLoading] = useState(false);
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [enabledSound, setEnabledSound] = useState(false);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
   const [audioSuccess, setAudioSuccess] = useState<DocumentPicker.DocumentPickerAsset>();
   const [audioInvalid, setAudioInvalid] = useState<DocumentPicker.DocumentPickerAsset>();
   const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [db, setDb] = useState(null as any);
+  const navigation = useNavigation();
+  const { data: session } = authClient.useSession();
 
   useEffect(() => {
+    navigation.setOptions({
+      title: 'Настройки',
+    });
+
     const loadSettings = async () => {
       if (initialized) return;
+      const _db = await initDb();
+      setDb(_db);
       const settings =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
       if (settings != null) {
         setVehicleNumber(settings.vehicleNumber || vehicleNumber);
@@ -33,7 +44,7 @@ export default function Settings() {
       setInitialized(true);
     }
     loadSettings();
-  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, vehicleNumber]);
+  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, navigation, vehicleNumber]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -90,12 +101,28 @@ export default function Settings() {
 
   const handleUpdateData = () => {
     const updateData = async () => {
-      const { data: session } = authClient.useSession();
       try {
-          setLoading(true);
-          const routes = await makeAuthenticatedRequest('routes?userId='+session?.user.id);
-          console.log(routes);
-          // update storage
+        let buses = await makeAuthenticatedRequest('buses?userId='+session?.user.id);
+        if (buses?.error) {
+          console.log(buses.error);
+          throw new Error(buses?.error);
+        }
+        updateBuses(db, buses);
+
+        let routes = await makeAuthenticatedRequest('routes?userId='+session?.user.id);
+        if (routes?.error) {
+          console.log(routes.error);
+          throw new Error(routes?.error);
+        }
+        updateRoutes(db, routes);
+
+        const cards = await makeAuthenticatedRequest('access-cards?userId='+session?.user.id);
+        if (cards?.error) {
+          console.log(cards.error);
+          throw new Error(cards?.error);
+        }
+        updateAccessCards(db, cards);
+        Alert.alert('Данные обновлены');
       } catch (error) {
           Alert.alert('ERROR', 'Невозможно обновить данные, попытайтесь позже', [{text: 'OK'}]);
           console.log("Error fetching data:", error);
@@ -105,12 +132,8 @@ export default function Settings() {
     };
 
     updateData();
-  }
-
-  if (loading) {
-    return <ThemedView style={styles.globalContainer}>
-            <ThemedText style={styles.textContainer}>Загрузка...</ThemedText>
-          </ThemedView>;
+    setLoading(true);
+    return;
   }
 
   return (
@@ -144,9 +167,18 @@ export default function Settings() {
           onChangeText={(value) => setDurationNameDisplaying(parseInt(value) || 0)}
         />
 
-        <Button title="Сохранить" onPress={() => handleSave()} />
+        <ThemedView style={styles.saveButton}>
+          <Button title="Сохранить" onPress={() => handleSave()} />
+        </ThemedView>
+
         <ThemedView style={styles.updateButton}>
-          <Button title="Обновить данные" onPress={() => handleUpdateData()} color="green" />
+          { 
+              loading 
+            ?
+              <ThemedText>Загрузка...</ThemedText>
+            : 
+              <Button title="Обновить данные" onPress={() => handleUpdateData()} color="green" />
+          }
         </ThemedView>
       </ThemedView>
     </ThemedView>
@@ -168,11 +200,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  textContainer: {
-    top: '50%',
-    left: '45%',
-    position: 'absolute',
-  },
   logo: {
     marginTop: 50,
     marginLeft: 'auto',
@@ -187,10 +214,14 @@ const styles = StyleSheet.create({
     width: '100%',
     display: 'flex',
     flexDirection: 'row',
+    marginTop: 20,
   },
   soundSwitch: {
     marginTop: -10,
     marginLeft: 'auto',
+  },
+  saveButton: {
+    marginTop: 20,
   }
 });
 

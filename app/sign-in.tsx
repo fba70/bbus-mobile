@@ -2,6 +2,7 @@ import { ThemedTextInput } from "@/components/themed-input";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { Image } from "expo-image";
+import { Redirect } from "expo-router";
 import React, { useState } from "react";
 import { Button, StyleSheet } from "react-native";
 
@@ -15,11 +16,9 @@ export default function SignIn() {
       password,
     });
   };
-  console.log("sedd", session);
-  /*
   if (session !== null) {
     return <Redirect href="/main" />;
-  }*/
+  }
   return (
     <ThemedView style={styles.globalContainer}>
       <Image

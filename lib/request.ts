@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import * as SecureStore from 'expo-secure-store';
 export const makeAuthenticatedRequest = async (api_path: string, body?: BodyInit | null | undefined, method: "POST" | "GET" = "GET") => {
   const cookies = authClient.getCookie(); 
   const headers: any = {
@@ -14,5 +15,6 @@ export const makeAuthenticatedRequest = async (api_path: string, body?: BodyInit
     body,
     method
   });
+  SecureStore.setItemAsync("lastConnectedTime", new Date().getTime().toString());
   return await response.json();
 };
