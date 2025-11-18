@@ -9,8 +9,7 @@ function renderNfcNotEnabled(setEnabled: Function) {
     return (
       <ThemedView>
         <ThemedText style={{textAlign: 'center', marginBottom: 10}}>
-          Your NFC is not enabled. Please first enable it and hit CHECK AGAIN
-          button
+          Your NFC is not enabled. Please first enable it and hit CHECK AGAIN button
         </ThemedText>
 
         <Button
