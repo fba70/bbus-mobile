@@ -12,7 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Button, Image, StyleSheet } from "react-native";
 import 'react-native-reanimated';
 
-export default function MainLayout() {
+export default function Main() {
   const { data: session } = authClient.useSession();
   const [route, setRoute] = useState({} as any);
   const [loading, setLoading] = useState(true);

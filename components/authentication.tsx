@@ -24,6 +24,7 @@ export default function Authentication(props: any) {
     const [handlingQr, setHandlingQr] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
+    const [passKeyTitle, setPassKeyTitle] = useState("Приложите пропуск");
     let audioSuccessPlayer = useAudioPlayer(audioSuccess);
     let audioInvalidPlayer = useAudioPlayer(audioInvalid);
   
@@ -74,6 +75,7 @@ export default function Authentication(props: any) {
         setPassKeyBoxColor('red');
         setTimeout(() => {
           setPassKeyBoxColor('grey');
+          setPassKeyTitle("Приложите пропуск");
           setHandlingQr(false);
         }, 1000);
         if (enabledSound) {
@@ -109,7 +111,6 @@ export default function Authentication(props: any) {
                           applicationId: (JSON.parse(settings).applicationId)
                         };
 
-                        console.log(journey);
       try {
         const result = await makeAuthenticatedRequest('journeys', JSON.stringify(journey), "POST");
         if (result?.error) {
@@ -120,8 +121,10 @@ export default function Authentication(props: any) {
       }
 
       setPassKeyBoxColor('green');
+      setPassKeyTitle(JSON.parse(сard.data).nameOnCard);
       setTimeout(() => {
         setPassKeyBoxColor('grey');
+        setPassKeyTitle("Приложите пропуск");
         setHandlingQr(false);
       }, 1000);
       if (enabledSound) {
@@ -151,12 +154,12 @@ export default function Authentication(props: any) {
 
     return <ThemedView style={styles.globalContainer}>
               <ThemedView style={styles.clientHeader}>
-                <ThemedText style={styles.textContainer}>{props.route.organization.name}</ThemedText>
+                <ThemedText style={styles.textContainer}>{props.route.organization?.name}</ThemedText>
                 <ThemedText style={styles.textContainer}>{props.route.routeName}</ThemedText>
               </ThemedView>
               {showQr === false ? 
                 <ThemedView style={[{backgroundColor: passKeyBoxColor}, styles.passKeyBox]}>
-                  <ThemedText style={styles.attachPasskey}>Приложите пропуск</ThemedText>
+                  <ThemedText style={styles.attachPasskey}>{passKeyTitle}</ThemedText>
                   {logo !== "" 
                   ?
                       <Image source={`data:${signature};base64,${logo}`} style={styles.logo}/>
