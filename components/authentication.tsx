@@ -1,9 +1,11 @@
 import QrCamera from '@/components/qrCamera';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useKeyEventListener } from "@/hooks/useKeyEventListener";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { getCardById, postponeJourney } from "@/lib/storage";
+import { debounce } from '@/lib/utils';
 import { useAudioPlayer } from 'expo-audio';
 import { Image } from "expo-image";
 import * as Location from 'expo-location';
@@ -21,7 +23,7 @@ export default function Authentication(props: any) {
     const [audioSuccess, setAudioSuccess] = useState(undefined);
     const [audioInvalid, setAudioInvalid] = useState(undefined);
     const [showQr, setShowQr] = useState(false);
-    const [handlingQr, setHandlingQr] = useState(false);
+    const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
     const [passKeyTitle, setPassKeyTitle] = useState("Приложите пропуск");
@@ -47,9 +49,9 @@ export default function Authentication(props: any) {
 
       async function getCurrentLocation() {
         let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
+        if (status !== "granted") {
           Alert.alert('Необходимо разрешить геолокации на устройстве');
-          router.push("/main");
+          router.push("/");
           return;
         }
 
@@ -67,16 +69,33 @@ export default function Authentication(props: any) {
       getLastConnectedTime();
     }, [audioInvalid, audioSuccess, initialized, lastConnectedTime]);
 
+    let currentCardFromKeybroad = "";
+    useKeyEventListener(async (event) => {
+      if (event) {
+        currentCardFromKeybroad += event.key;
+      }
+      Alert.alert("event: " + JSON.stringify(event));
+      debounce(() => {
+        Alert.alert("currentCardFromKeybroad: " + currentCardFromKeybroad);
+        handleCard(currentCardFromKeybroad);
+        currentCardFromKeybroad = "";
+      }, 2000);
+    });
+      
     const handleQrScanned = async (data: any) => {
-      if (handlingQr) return;
-      setHandlingQr(true);
-      const сard: any = await getCardById(props.db, data);
+      handleCard(data);
+    };
+
+    const handleCard = async (cardId: string) => {
+      if (handlingCard) return;
+      setHandlingCard(true);
+      const сard: any = await getCardById(props.db, cardId);
       if (сard == null) {
         setPassKeyBoxColor('red');
         setTimeout(() => {
           setPassKeyBoxColor('grey');
           setPassKeyTitle("Приложите пропуск");
-          setHandlingQr(false);
+          setHandlingCard(false);
         }, 1000);
         if (enabledSound) {
           audioInvalidPlayer.play();
@@ -91,12 +110,12 @@ export default function Authentication(props: any) {
       const settings: any = await SecureStore.getItemAsync("settings");
       if (settings == null || !(JSON.parse(settings).applicationId)) {
         Alert.alert("Настройки не найдены. Перейдите в настройки и заполните их.");
-        router.push("/main");
+        router.push("/");
         return;
       }
 
       if (location == null) {
-        router.push("/main");
+        router.push("/");
         return;
       }
 
@@ -125,7 +144,7 @@ export default function Authentication(props: any) {
       setTimeout(() => {
         setPassKeyBoxColor('grey');
         setPassKeyTitle("Приложите пропуск");
-        setHandlingQr(false);
+        setHandlingCard(false);
       }, 1000);
       if (enabledSound) {
         audioSuccessPlayer.play();

@@ -1,9 +1,11 @@
 import QrCamera from '@/components/qrCamera';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useKeyEventListener } from "@/hooks/useKeyEventListener";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { getCardById, postponeJourney } from "@/lib/storage";
+import { debounce } from '@/lib/utils';
 import { useAudioPlayer } from 'expo-audio';
 import { Image } from "expo-image";
 import * as Location from 'expo-location';
@@ -21,11 +23,12 @@ export default function Registration(props: any) {
     const [audioSuccess, setAudioSuccess] = useState(undefined);
     const [audioInvalid, setAudioInvalid] = useState(undefined);
     const [showQr, setShowQr] = useState(false);
-    const [handlingQr, setHandlingQr] = useState(false);
+    const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
+    const [currentCardFromKeybroad, setCurrentCardFromKeybroad] = useState("");
     let audioSuccessPlayer = useAudioPlayer(audioSuccess);
-  
+
     useEffect(() => {
       const loadSettings = async () => {
         if (initialized) return;
@@ -47,7 +50,7 @@ export default function Registration(props: any) {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert('Необходимо разрешить геолокации на устройстве');
-          router.push("/main");
+          router.push("/");
           return;
         }
 
@@ -65,15 +68,32 @@ export default function Registration(props: any) {
       getLastConnectedTime();
     }, [audioInvalid, audioSuccess, initialized, lastConnectedTime]);
 
+    useKeyEventListener((event) => {
+      if (event) {
+        setCurrentCardFromKeybroad(currentCardFromKeybroad + event.key);
+      }
+      Alert.alert("event: " + JSON.stringify(event));
+      Alert.alert("currentCardFromKeybroad: " + currentCardFromKeybroad);
+      debounce(() => {
+        Alert.alert("currentCardFromKeybroad: " + currentCardFromKeybroad);
+        handleCard(currentCardFromKeybroad);
+        setCurrentCardFromKeybroad("");
+      }, 1000);
+    });
+
     const handleQrScanned = async (data: any) => {
-      if (handlingQr) return;
-      setHandlingQr(true);
+      handleCard(data);
+    }
+
+    const handleCard = async (cardId: string) => {
+      if (handlingCard) return;
+      setHandlingCard(true);
       
       const settings: any = await SecureStore.getItemAsync("settings");
 
       if (settings == null || !(JSON.parse(settings).applicationId)) {
         Alert.alert("Настройки не найдены. Перейдите в настройки и заполните их.");
-        router.push("/main");
+        router.push("/");
         return;
       }
 
@@ -87,10 +107,10 @@ export default function Registration(props: any) {
                           applicationId: (JSON.parse(settings).applicationId)
                         } as any;
 
-      const сard: any = await getCardById(props.db, data);
+      const сard: any = await getCardById(props.db, cardId);
       if (сard == null) {
         journey.accessCardId = "acebbd7a-e282-4aeb-8631-c49e93d230a1";
-        journey.newCardId = data;
+        journey.newCardId = cardId;
         journey.newCardType = "QR_CODE" //"NFC", "RFID", "QR_CODE")
       } else {
         journey.accessCardId = сard.id;
@@ -108,7 +128,7 @@ export default function Registration(props: any) {
       setPassKeyBoxColor('green');
       setTimeout(() => {
         setPassKeyBoxColor('grey');
-        setHandlingQr(false);
+        setHandlingCard(false);
       }, 1000);
       if (enabledSound) {
         audioSuccessPlayer.play();
@@ -155,7 +175,7 @@ export default function Registration(props: any) {
               }
               <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={"back"} />
               {<Button title={`${!showQr ? "Показать" : "Скрыть"} видео с камеры для Qr кода`} onPress={() => setShowQr(!showQr)} ></Button>}
-
+<ThemedText style={styles.textContainer}>{currentCardFromKeybroad}</ThemedText>
               <ThemedText style={styles.textContainer}>Режим работы: Регистрация.</ThemedText>
               <ThemedText style={styles.textContainer}>Обмен с сервером: {lastConnectedTime}</ThemedText>
             </ThemedView>

@@ -6,7 +6,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { getBusByNumber, getRoutes, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
-import { Link, router } from 'expo-router';
+import { Link, Redirect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Image, StyleSheet } from "react-native";
@@ -22,6 +22,8 @@ export default function Main() {
   const [currentBus, setCurrentBus] = useState(null as any);
 
   useEffect(() => {
+    if (session == null) return;
+    
     const loadData = async () => {
       if (initialized) return;
       setInitialized(true);
@@ -122,10 +124,14 @@ export default function Main() {
     };
 
     loadData();
-  }, [initialized, session?.user.id]); // Empty dependency array to run once on mount
+  }, [initialized, session, session?.user.id]); // Empty dependency array to run once on mount
 
   const handleReload = () => {
-    router.push("/main");
+    router.push("/");
+  }
+
+  if (session == null) {
+    return <Redirect href="/sign-in" />;
   }
 
   if (loading) {

@@ -4,7 +4,7 @@ import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { useNavigation } from '@react-navigation/native';
 import { Image } from "expo-image";
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, Button, StyleSheet } from "react-native";
 
@@ -30,11 +30,15 @@ export default function SignIn() {
     setLoading(false);
     if (result.error) {
       Alert.alert("Ошибка входа: " + result.error.message);
+    } else {
+      router.push("/");
     }
   };
+
   if (session !== null) {
-    return <Redirect href="/main" />;
+    return <Redirect href="/" />;
   }
+  
   return (
     <ThemedView style={styles.globalContainer}>
       <Image

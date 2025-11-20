@@ -31,7 +31,7 @@ export default function RootLayout() {
   }, [initialized]);
   
   const handleReload = () => {
-    router.push('/main');
+    router.push("/");
   }
 
   return (
@@ -44,7 +44,7 @@ export default function RootLayout() {
         </ThemedView>
       : 
         <Stack>
-          <Stack.Screen name="main" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
         </Stack>
       }
       <StatusBar style="auto" />

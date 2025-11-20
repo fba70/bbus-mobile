@@ -7,7 +7,7 @@ import { makeAuthenticatedRequest } from '@/lib/request';
 import { initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import { Alert, Button, StyleSheet } from "react-native";
@@ -29,6 +29,7 @@ export default function Settings() {
       title: 'Настройки',
     });
 
+    if (session == null) return;
     const loadSettings = async () => {
       if (initialized) return;
       const _db = await initDb();
@@ -44,7 +45,7 @@ export default function Settings() {
       setInitialized(true);
     }
     loadSettings();
-  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, navigation, vehicleNumber]);
+  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, navigation, session, vehicleNumber]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -95,7 +96,7 @@ export default function Settings() {
 
   const handleSave = () => {
     SecureStore.setItemAsync("settings", JSON.stringify({vehicleNumber, enabledSound, durationNameDisplaying, audioSuccess, audioInvalid}));
-    router.push('/main');
+    router.push("/");
     return;
   }
 
@@ -134,6 +135,10 @@ export default function Settings() {
     updateData();
     setLoading(true);
     return;
+  }
+
+  if (session == null) {
+    return <Redirect href="/sign-in" />;
   }
 
   return (
