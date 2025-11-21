@@ -19,9 +19,7 @@ class ExpoKeyEventView(context: Context, appContext: AppContext, private val onK
 
   override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
     // Only process the initial key down event, ignore repeats
-    if (event?.repeatCount == 0) {
-      onKeyPress(mapOf("key" to keyCode.toString()))
-    }
+    onKeyPress(mapOf("key" to keyCode.toString()))
     return super.onKeyDown(keyCode, event)
   }
 

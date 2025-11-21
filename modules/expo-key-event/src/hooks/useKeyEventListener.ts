@@ -2,8 +2,8 @@ import { useEventListener } from "expo";
 import { useCallback, useEffect } from "react";
 import { DevSettings } from "react-native";
 
-import { KeyPressEvent } from "../ExpoKeyEvent.types";
-import ExpoKeyEventModule from "../ExpoKeyEventModule";
+import { KeyPressEvent } from "../../ExpoKeyEvent.types";
+import ExpoKeyEventModule from "../../ExpoKeyEventModule";
 import { unifyKeyCode } from "../utils/unifyKeyCode";
 
 /**
@@ -21,12 +21,15 @@ export function useKeyEventListener(
 ) {
   const onKeyPress = useCallback(
     ({ key }: KeyPressEvent) => {
-      const uniKey = unifyKeyCode(key);
-      if (!preventReload && __DEV__ && uniKey === "KeyR") DevSettings.reload();
-
-      listener({ key: uniKey });
+      const keys = key.split(':');
+      const uniKeys = keys.map((key) => {
+        const uniKey = unifyKeyCode(key);
+        if (!preventReload && __DEV__ && uniKey === "KeyR") DevSettings.reload();
+        return uniKey;
+      });
+      listener({ key: uniKeys.join(':') });
     },
-    [listener],
+    [listener, preventReload],
   );
 
   useEventListener(ExpoKeyEventModule, "onKeyPress", onKeyPress);

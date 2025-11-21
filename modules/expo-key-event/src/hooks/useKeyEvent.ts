@@ -2,7 +2,7 @@ import { useEvent } from "expo";
 import { useEffect, useMemo } from "react";
 import { DevSettings } from "react-native";
 
-import ExpoKeyEventModule from "../ExpoKeyEventModule";
+import ExpoKeyEventModule from "../../ExpoKeyEventModule";
 import { unifyKeyCode } from "../utils/unifyKeyCode";
 
 /**
@@ -31,7 +31,7 @@ export function useKeyEvent(listenOnMount = true, preventReload = false) {
     return {
       key: uniKey,
     };
-  }, [event]);
+  }, [event, preventReload]);
 
   return {
     /**

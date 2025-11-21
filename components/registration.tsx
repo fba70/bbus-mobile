@@ -1,7 +1,7 @@
 import QrCamera from '@/components/qrCamera';
+import { ThemedTextInput } from '@/components/themed-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useKeyEventListener } from "@/hooks/useKeyEventListener";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { getCardById, postponeJourney } from "@/lib/storage";
@@ -26,7 +26,7 @@ export default function Registration(props: any) {
     const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
-    const [currentCardFromKeybroad, setCurrentCardFromKeybroad] = useState("");
+    const [currentCardFromKeyboard, setCurrentCardFromKeyboard] = useState("");
     let audioSuccessPlayer = useAudioPlayer(audioSuccess);
 
     useEffect(() => {
@@ -67,19 +67,6 @@ export default function Registration(props: any) {
 
       getLastConnectedTime();
     }, [audioInvalid, audioSuccess, initialized, lastConnectedTime]);
-
-    useKeyEventListener((event) => {
-      if (event) {
-        setCurrentCardFromKeybroad(currentCardFromKeybroad + event.key);
-      }
-      Alert.alert("event: " + JSON.stringify(event));
-      Alert.alert("currentCardFromKeybroad: " + currentCardFromKeybroad);
-      debounce(() => {
-        Alert.alert("currentCardFromKeybroad: " + currentCardFromKeybroad);
-        handleCard(currentCardFromKeybroad);
-        setCurrentCardFromKeybroad("");
-      }, 1000);
-    });
 
     const handleQrScanned = async (data: any) => {
       handleCard(data);
@@ -175,7 +162,8 @@ export default function Registration(props: any) {
               }
               <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={"back"} />
               {<Button title={`${!showQr ? "Показать" : "Скрыть"} видео с камеры для Qr кода`} onPress={() => setShowQr(!showQr)} ></Button>}
-<ThemedText style={styles.textContainer}>{currentCardFromKeybroad}</ThemedText>
+              <ThemedTextInput onChangeText={(value: string) => debounce(() => setCurrentCardFromKeyboard(value), 1000)} style={styles.cardFromKeyboard} autoFocus={true}/>
+              <ThemedText>{currentCardFromKeyboard}</ThemedText>
               <ThemedText style={styles.textContainer}>Режим работы: Регистрация.</ThemedText>
               <ThemedText style={styles.textContainer}>Обмен с сервером: {lastConnectedTime}</ThemedText>
             </ThemedView>
@@ -222,5 +210,8 @@ const styles = StyleSheet.create({
     marginRight: 'auto',
     width: 200,
     height: 200,
+  },
+  cardFromKeyboard: {
+    display: "none"
   }
 });

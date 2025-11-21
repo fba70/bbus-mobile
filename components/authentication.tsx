@@ -1,11 +1,11 @@
 import QrCamera from '@/components/qrCamera';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useKeyEventListener } from "@/hooks/useKeyEventListener";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { getCardById, postponeJourney } from "@/lib/storage";
 import { debounce } from '@/lib/utils';
+import { useKeyEventListener } from "@/modules/expo-key-event/src/hooks/useKeyEventListener";
 import { useAudioPlayer } from 'expo-audio';
 import { Image } from "expo-image";
 import * as Location from 'expo-location';
