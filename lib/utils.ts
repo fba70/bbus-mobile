@@ -29,3 +29,29 @@ export function unifyKeyCode(keyCode: string): string {
   }
   return res ?? keyCode;
 }
+
+export function vehicleNumberTranslate(text: string) {
+  const transl: any = {};
+  transl['А'] = 'A';
+  transl['В'] = 'B';
+  transl['Е'] = 'E';
+  transl['К'] = 'K';
+  transl['М'] = 'M';
+  transl['Н'] = 'H';
+  transl['О'] = 'O';
+  transl['Р'] = 'P';
+  transl['С'] = 'C';
+  transl['Т'] = 'T';
+  transl['У'] = 'Y';
+  transl['Х'] = 'X';
+
+  let result: string = '';
+  for (let i = 0; i < text.length; i++) {
+    if (transl[text[i]] !== undefined) {
+      result += transl[text[i]];
+    } else {
+      result += text[i];
+    }
+  }
+  return result;
+}

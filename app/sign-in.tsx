@@ -5,8 +5,9 @@ import { authClient } from "@/lib/auth-client";
 import { useNavigation } from '@react-navigation/native';
 import { Image } from "expo-image";
 import { Redirect, router } from "expo-router";
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { Alert, Button, StyleSheet } from "react-native";
+import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
 export default function SignIn() {
   const { data: session } = authClient.useSession();
@@ -21,6 +22,9 @@ export default function SignIn() {
   });
 
   const handleLogin = async () => {
+    const settings: any =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
+    delete settings.vehicleNumber;
+    SecureStore.setItem("settings", JSON.stringify(settings));
     setLoading(true);
     const result = await authClient.signIn.email({
       email,
@@ -54,9 +58,17 @@ export default function SignIn() {
         <ThemedTextInput
           placeholder="Пароль"
           value={password}
+          secureTextEntry={true}
+          textContentType="password"
           onChangeText={(value) => setPassword(value)}
         />
-        { loading ? <ThemedText>Загрузка...</ThemedText> : <Button title="Войти" onPress={() => handleLogin()} /> }
+        { loading ? <ThemedText>Загрузка...</ThemedText> : 
+          <ThemedView>
+            <TouchableOpacity onPress={() => handleLogin()}>
+              <ThemedText style={styles.redButton}>Войти</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        }
       </ThemedView>
     </ThemedView>
   );
@@ -83,5 +95,15 @@ const styles = StyleSheet.create({
     marginRight: 'auto',
     height: 140,
     width: 346,
+  },
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    marginLeft: 20,
+    marginRight: 20,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
   },
 });
