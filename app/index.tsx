@@ -5,7 +5,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { getBusByNumber, getRoutes, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { getBusByNumber, getBusesCount, getNewAccessCards, getNewBuses, getNewRoutes, getRoutes, initDb } from '@/lib/storage';
 import { Link, Redirect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
@@ -23,7 +23,7 @@ export default function Main() {
 
   useEffect(() => {
     if (session == null) return;
-    
+
     const loadData = async () => {
       if (initialized) return;
       setInitialized(true);
@@ -60,19 +60,15 @@ export default function Main() {
             setConnected(false);
           }
 
-          let buses = [];
           try {
-            buses = await makeAuthenticatedRequest('buses?userId='+session?.user.id);
-            if (buses?.error) {
-              console.log(buses.error);
-              setConnected(false);
-              return;
+            if (await getBusesCount(_db) === 0) {
+              await getNewBuses(_db, session?.user.id);
+            } else {
+              getNewBuses(_db, session?.user.id);
             }
-            updateBuses(_db, buses);
-            setConnected(true);
           } catch(e: any) {
-            console.log("нет сети", e);
-            setConnected(false);
+            console.log("нет buses сети", e);
+            //setConnected(false);
           }
 
           const _currentBus: any = await getBusByNumber(_db, vehicleNumber);
@@ -82,38 +78,35 @@ export default function Main() {
             router.push("/settings");
             return;
           }
+
           setCurrentBus(_currentBus);
-          let routes = [];
+
+          let routes: any = (await getRoutes(_db)).map((item: any) => JSON.parse(item.data));
           try {
-            routes = await makeAuthenticatedRequest('routes?userId='+session?.user.id);
-            if (routes?.error) {
-              console.log(routes.error);
-              setConnected(false);
-              return;
+            if (routes.length === 0 ) {
+              routes = await getNewRoutes(_db, session?.user.id);
+            } else {
+              routes = getNewRoutes(_db, session?.user.id);
             }
-            updateRoutes(_db, routes);
           } catch(e: any) {
             console.log("нет routes сети", e);
-            setConnected(false);
-            routes = await getRoutes(_db);
+            //setConnected(false);
           }
-        
+
+          getNewAccessCards(_db, session?.user.id);
+
+          let timeSlots = JSON.parse(_currentBus.data).timeSlots;
+          if (timeSlots?.length > 0) {
+            timeSlots.map((slot: any) => {
+              if (new Date(slot.startTimestamp).getTime() < new Date().getTime() && new Date().getTime() < new Date(slot.endTimestamp).getTime()) {
+                _currentBus.routeId = slot.routeId;
+                return;
+              }
+            });
+          }
+
           const currentRoute = routes.filter((route: any) => route.id === _currentBus.routeId);
           setRoute(currentRoute[0]);
-
-          try {
-            const cards = await makeAuthenticatedRequest('access-cards?userId='+session?.user.id);
-            if (cards?.error) {
-              console.log(cards.error);
-              setConnected(false);
-              return;
-            }
-            updateAccessCards(_db, cards);
-          } catch(e: any) {
-            console.log("нет cards сети", e);
-            setConnected(false);
-          }
-
       } catch (error: any) {
           console.log("Error fetching data:", error);
           Alert.alert("Нет сети, перезагрузите страницу позднее.");
@@ -149,11 +142,11 @@ export default function Main() {
   }
 
   return (
-    <ThemedView>
-      <ThemedView style={styles.header}>
-        <Image source={require("@/assets/images/Logo_BBUS.webp")}/>
-        <Link href="/settings" style={styles.menu}>
-          <IconSymbol color="black" name='ellipsis'/>
+    <ThemedView tabIndex={-1}>
+      <ThemedView style={styles.header} tabIndex={-1}>
+        <Image style={styles.headerImage} source={require("@/assets/images/Logo_BBUS.webp")} />
+        <Link href="/settings" style={styles.headerIcon} tabIndex={-1}>
+          <IconSymbol size={35}  color="black" name='ellipsis'/>
         </Link>
       </ThemedView>
       {route != null && route.routeMode === "REGISTRATION" ?
@@ -173,12 +166,25 @@ const styles = StyleSheet.create({
   header: {
     display: 'flex',
     flexDirection: 'row',
-    backgroundColor: 'red',
-    borderBottomLeftRadius: 50,
-    padding: 10,
+    borderBottomColor: "rgb(0,0,0,0.1)",
+    borderBottomWidth: 2,
+    height: "8%",
+    marginBottom: 0,
+    marginTop: 20,
+    paddingLeft: 10,
   },
-  menu: {
-    marginTop: 65,
+  headerImage: {
+    height: "auto",
+    width: "60%",
+  },
+  headerIcon: {
+    display: "flex",
+    verticalAlign: "middle",
+    width: "40%",
+    textAlign: "right",
+    alignItems: 'baseline',
+    paddingRight: 10,
+    marginTop: 10,
   },
   textContainer: {
     top: '50%',

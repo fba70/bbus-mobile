@@ -20,7 +20,7 @@ export function ThemedTextInput({
       placeholderTextColor={color}
       style={[
         { color },
-        {borderColor: color, borderWidth: 1, padding: 10},
+        {borderColor: "#D1D5DC", borderWidth: 1, padding: 10},
         style,
       ]}
       {...rest}

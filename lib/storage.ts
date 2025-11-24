@@ -1,3 +1,4 @@
+import { makeAuthenticatedRequest } from '@/lib/request';
 import * as SQLite from 'expo-sqlite';
 
 export const initDb = async () => {
@@ -19,9 +20,9 @@ export const getBusByNumber = async (db: SQLite.SQLiteDatabase, busNumber: strin
     return bus
 }
 
-export const getBuses = async (db: SQLite.SQLiteDatabase) => {
-    const buses = await db.getAllAsync('SELECT * FROM bus WHERE 1');
-    return buses
+export const getBusesCount = async (db: SQLite.SQLiteDatabase) => {
+    const busesCount: any = await db.getAllAsync('SELECT COUNT(*) as num FROM bus WHERE 1');
+    return busesCount[0]["num"]
 }
 
 export const updateBuses = async (db: SQLite.SQLiteDatabase, buses: any) => {
@@ -59,4 +60,43 @@ export const updateAccessCards = async (db: SQLite.SQLiteDatabase, accessCards: 
 
 export const postponeJourney = async (db: SQLite.SQLiteDatabase, journey: any) => {
     await db.runAsync('INSERT OR REPLACE INTO journey (id, data) VALUES (NULL, ?)', JSON.stringify(journey));
+}
+
+export const getJourneys = async (db: SQLite.SQLiteDatabase) => {
+    const journeys = await db.getAllAsync('SELECT * FROM journey WHERE 1');
+    return journeys
+}
+
+export const deleteJourney = async (db: SQLite.SQLiteDatabase, id: number) => {
+    await db.getAllAsync('DELETE FROM journey WHERE id = ?', id);
+}
+
+export const getNewBuses = async (db: SQLite.SQLiteDatabase, sessionId: string) => {
+    let buses = await makeAuthenticatedRequest('buses?userId='+sessionId);
+    if (buses?.error) {
+        console.log(buses.error);
+        return;
+    }
+    updateBuses(db, buses);
+    return buses;
+}
+
+export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string) => {
+    let routes = await makeAuthenticatedRequest('routes?userId='+sessionId);
+    if (routes?.error) {
+        console.log(routes.error);
+        return;
+    }
+    updateRoutes(db, routes);
+    return routes;
+}
+
+export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: string) => {
+    const cards = await makeAuthenticatedRequest('access-cards?userId='+sessionId);
+    if (cards?.error) {
+        console.log(cards.error);
+        return;
+    }
+    updateAccessCards(db, cards);
+    return cards;
 }

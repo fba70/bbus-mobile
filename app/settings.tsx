@@ -5,16 +5,18 @@ import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
 import { initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { vehicleNumberTranslate } from '@/lib/utils';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Redirect, router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { Alert, Button, StyleSheet } from "react-native";
+import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
 export default function Settings() {
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [enabledSound, setEnabledSound] = useState(false);
+  const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
   const [audioSuccess, setAudioSuccess] = useState<DocumentPicker.DocumentPickerAsset>();
   const [audioInvalid, setAudioInvalid] = useState<DocumentPicker.DocumentPickerAsset>();
@@ -37,7 +39,8 @@ export default function Settings() {
       const settings =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
       if (settings != null) {
         setVehicleNumber(settings.vehicleNumber || vehicleNumber);
-        setEnabledSound(settings.enabledSound || enabledSound);
+        setEnabledSound(settings.enabledSound !== undefined ? settings.enabledSound : enabledSound);
+        setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : enabledFrontCamera);
         setDurationNameDisplaying(settings.durationNameDisplaying || durationNameDisplaying);
         setAudioSuccess(settings.audioSuccess || audioSuccess);
         setAudioInvalid(settings.audioInvalid || audioInvalid);
@@ -45,7 +48,7 @@ export default function Settings() {
       setInitialized(true);
     }
     loadSettings();
-  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, navigation, session, vehicleNumber]);
+  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledFrontCamera, enabledSound, initialized, navigation, session, vehicleNumber]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -95,7 +98,7 @@ export default function Settings() {
   };
 
   const handleSave = () => {
-    SecureStore.setItemAsync("settings", JSON.stringify({vehicleNumber, enabledSound, durationNameDisplaying, audioSuccess, audioInvalid}));
+    SecureStore.setItem("settings", JSON.stringify({vehicleNumber, enabledSound, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
     router.push("/");
     return;
   }
@@ -148,22 +151,34 @@ export default function Settings() {
         <ThemedTextInput
           placeholder="Формат AA(777)(777) или А(777)АА(777)"
           defaultValue={vehicleNumber}
-          onChangeText={(value) => setVehicleNumber(value)}
+          onChangeText={(value) => {setVehicleNumber(vehicleNumberTranslate(value).toUpperCase())}}
         />
 
-        <ThemedView style={styles.soundSwitchConteiner}>
+        <ThemedView style={styles.switchContainer}>
           <ThemedText>Включить звуковые сигналы</ThemedText>
-          <ThemedSwitch style={styles.soundSwitch}
+          <ThemedSwitch style={styles.switchElement}
             value={enabledSound}
             onValueChange={(value) => setEnabledSound(value)}
           />
         </ThemedView>
 
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Использовать фронтальную камеру</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledFrontCamera}
+            onValueChange={(value) => setEnabledFrontCamera(value)}
+          />
+        </ThemedView>
+
         <ThemedText>Звук для успешного считывания пропуска - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
-        <Button title="Выбрать" onPress={() => pickAudioSuccess()} />
+        <TouchableOpacity onPress={() => pickAudioSuccess()}>
+          <ThemedText style={styles.redButton}>Выбрать</ThemedText>
+        </TouchableOpacity>
 
         <ThemedText>Звук для невалидного пропуска - {audioInvalid? audioInvalid.name: 'Не выбрано'}</ThemedText>
-        <Button title="Выбрать" onPress={() => pickAudioInvalid()} />
+        <TouchableOpacity onPress={() => pickAudioInvalid()}>
+          <ThemedText style={styles.redButton}>Выбрать</ThemedText>
+        </TouchableOpacity>
 
         <ThemedText>Время отображения ФИО сотрудника</ThemedText>
         <ThemedTextInput
@@ -173,7 +188,9 @@ export default function Settings() {
         />
 
         <ThemedView style={styles.saveButton}>
-          <Button title="Сохранить" onPress={() => handleSave()} />
+          <TouchableOpacity onPress={() => handleSave()}>
+            <ThemedText style={styles.redButton}>Сохранить</ThemedText>
+          </TouchableOpacity>
         </ThemedView>
 
         <ThemedView style={styles.updateButton}>
@@ -182,7 +199,9 @@ export default function Settings() {
             ?
               <ThemedText>Загрузка...</ThemedText>
             : 
-              <Button title="Обновить данные" onPress={() => handleUpdateData()} color="green" />
+            <TouchableOpacity onPress={() => handleUpdateData()}>
+              <ThemedText style={styles.greenButton}>Обновить данные</ThemedText>
+            </TouchableOpacity>
           }
         </ThemedView>
       </ThemedView>
@@ -215,18 +234,34 @@ const styles = StyleSheet.create({
   updateButton: {
     marginTop: 75,
   },
-  soundSwitchConteiner: {
+  switchContainer: {
     width: '100%',
     display: 'flex',
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: 10,
   },
-  soundSwitch: {
+  switchElement: {
     marginTop: -10,
     marginLeft: 'auto',
   },
   saveButton: {
     marginTop: 20,
+  },
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
+  },
+  greenButton: {
+    backgroundColor: "green",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
   }
 });
 
