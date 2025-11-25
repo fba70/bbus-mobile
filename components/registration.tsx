@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { getCardById, postponeJourney } from "@/lib/storage";
+import { addLog, getCardById, postponeJourney } from "@/lib/storage";
 import { debounce } from "@/lib/utils";
 import { useAudioPlayer } from 'expo-audio';
 import { Image } from "expo-image";
@@ -123,6 +123,8 @@ export default function Registration(props: any) {
         const result = await makeAuthenticatedRequest('journeys', JSON.stringify(journey), "POST");
         if (result?.error) {
           postponeJourney(props.db, journey);
+        } else {
+          addLog(props.db, "sent journey", JSON.stringify(journey));
         }
       } catch(e: any) {
         postponeJourney(props.db, journey);
@@ -163,7 +165,6 @@ export default function Registration(props: any) {
                 onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 1000)}
                 style={styles.cardFromKeyboard} onBlur={() => { Keyboard.dismiss(); inputRef.current.focus(); }} />
               <ThemedView style={styles.clientHeader} tabIndex={-1}>
-                <ThemedText style={styles.textContainer}>Ваш водитель: {session?.user.name}</ThemedText>
                 <ThemedText style={styles.textContainer}>{props.route.organization.name}</ThemedText>
                 <ThemedText style={[styles.textContainer, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
               </ThemedView>
@@ -251,7 +252,8 @@ const styles = StyleSheet.create({
     height: 100,
     borderWidth: 1,
     borderRadius: 10,
-    borderColor: '#D1D5DC'
+    borderColor: '#D1D5DC',
+    objectFit: "contain"
   },
   textPassengerName: {
     borderTopWidth: 1,

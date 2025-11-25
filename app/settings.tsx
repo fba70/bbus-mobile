@@ -4,8 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
-import { vehicleNumberTranslate } from '@/lib/utils';
+import { getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Redirect, router } from "expo-router";
@@ -14,7 +13,6 @@ import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
 export default function Settings() {
-  const [vehicleNumber, setVehicleNumber] = useState("");
   const [enabledSound, setEnabledSound] = useState(false);
   const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
@@ -38,7 +36,6 @@ export default function Settings() {
       setDb(_db);
       const settings =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
       if (settings != null) {
-        setVehicleNumber(settings.vehicleNumber || vehicleNumber);
         setEnabledSound(settings.enabledSound !== undefined ? settings.enabledSound : enabledSound);
         setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : enabledFrontCamera);
         setDurationNameDisplaying(settings.durationNameDisplaying || durationNameDisplaying);
@@ -48,7 +45,8 @@ export default function Settings() {
       setInitialized(true);
     }
     loadSettings();
-  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledFrontCamera, enabledSound, initialized, navigation, session, vehicleNumber]);
+
+  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledSound, initialized, navigation, session]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -97,9 +95,36 @@ export default function Settings() {
     }
   };
 
-  const handleSave = () => {
-    SecureStore.setItem("settings", JSON.stringify({vehicleNumber, enabledSound, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
+  const handleSave = async () => {
+    const settings: any = await SecureStore.getItemAsync("settings");
+    if (settings == null) {
+      SecureStore.setItem("settings", JSON.stringify({enabledSound, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
+    } else {
+      const _settings = JSON.parse(settings);
+      _settings.enabledSound = enabledSound;
+      _settings.enabledFrontCamera = enabledFrontCamera;
+      _settings.durationNameDisplaying = durationNameDisplaying;
+      _settings.audioSuccess = audioSuccess;
+      _settings.audioInvalid = audioInvalid;
+      SecureStore.setItem("settings", JSON.stringify(_settings));
+    }
     router.push("/");
+    return;
+  }
+
+  const handleLogout = () => {
+    authClient.signOut();
+    router.push("/sign-in");
+    return;
+  }
+
+  const handleLog = async () => {
+    const records: any = await getLog(db);
+    let rows: any = [];
+    for (let i in records) {
+      rows.push(JSON.stringify(records[i]));
+    }
+    Alert.alert("Log", rows.join(`\n\r\n\r`));
     return;
   }
 
@@ -147,13 +172,6 @@ export default function Settings() {
   return (
     <ThemedView style={styles.globalContainer}>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText>Номер ТС</ThemedText>
-        <ThemedTextInput
-          placeholder="Формат AA(777)(777) или А(777)АА(777)"
-          defaultValue={vehicleNumber}
-          onChangeText={(value) => {setVehicleNumber(vehicleNumberTranslate(value).toUpperCase())}}
-        />
-
         <ThemedView style={styles.switchContainer}>
           <ThemedText>Включить звуковые сигналы</ThemedText>
           <ThemedSwitch style={styles.switchElement}
@@ -193,6 +211,20 @@ export default function Settings() {
           </TouchableOpacity>
         </ThemedView>
 
+        <ThemedView style={styles.buttons}>
+          <ThemedView style={styles.logoutButton}>
+            <TouchableOpacity onPress={() => handleLogout()}>
+              <ThemedText style={styles.redButton}>Выйти</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        
+          <ThemedView style={styles.logButton}>
+            <TouchableOpacity onPress={() => handleLog()}>
+              <ThemedText style={styles.redButton}>Показать лог</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        </ThemedView>
+
         <ThemedView style={styles.updateButton}>
           { 
               loading 
@@ -204,6 +236,7 @@ export default function Settings() {
             </TouchableOpacity>
           }
         </ThemedView>
+
       </ThemedView>
     </ThemedView>
   );
@@ -244,7 +277,18 @@ const styles = StyleSheet.create({
     marginTop: -10,
     marginLeft: 'auto',
   },
+  buttons: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
   saveButton: {
+    marginTop: 20,
+  },
+  logoutButton: {
+    marginTop: 20,
+  },
+  logButton: {
     marginTop: 20,
   },
   redButton: {

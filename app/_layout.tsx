@@ -1,4 +1,5 @@
 
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { authClient } from "@/lib/auth-client";
@@ -7,7 +8,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { Button, StyleSheet } from "react-native";
+import { StyleSheet, TouchableOpacity } from "react-native";
 import 'react-native-reanimated';
 
 export default function RootLayout() {
@@ -40,7 +41,9 @@ export default function RootLayout() {
       {connected === false ?
         <ThemedView style={styles.globalContainer}>
           <ThemedView style={styles.textContainer}>
-            <Button title="Перезагрузить" onPress={() => {handleReload()}}/>
+            <TouchableOpacity onPress={() => handleReload()}>
+              <ThemedText style={styles.redButton}>Перезагрузить</ThemedText>
+            </TouchableOpacity>
           </ThemedView>
         </ThemedView>
       : 
@@ -64,5 +67,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
     width: '100%',
     position: 'absolute',
+  },
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
   },
 });

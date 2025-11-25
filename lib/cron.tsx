@@ -1,5 +1,5 @@
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { deleteJourney, getJourneys, initDb } from '@/lib/storage';
+import { addLog, deleteJourney, getJourneys, initDb } from '@/lib/storage';
 import * as BackgroundTask from 'expo-background-task';
 import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
@@ -15,21 +15,23 @@ TaskManager.defineTask(BACKGROUND_TASK_IDENTIFIER, async () => {
   try {
     const now = Date.now();
     const lastConnectedTime = parseInt(await SecureStore.getItemAsync("lastConnectedTime") ?? "0");
-    if (lastConnectedTime !== 0 && now - lastConnectedTime < 60*60) {
+    if (lastConnectedTime !== 0 && now - lastConnectedTime < 15*60) { // 15 minutes
       return;
     }
-    console.log(`Got background task call at date: ${new Date(now).toISOString()}`);
     const _db = await initDb();
+    
+    addLog(_db, `Got background task call at date: ${new Date(now).toISOString()}`, {});
 
     const journeys = await getJourneys(_db);
     journeys.map(async (journey: any) => {
       let shouldDelete: boolean = false;
       try {
-        const result = await makeAuthenticatedRequest('journeys', JSON.stringify(journey.data), "POST");
+        const result = await makeAuthenticatedRequest('journeys', journey.data, "POST");
         if (result?.error) {
           shouldDelete = false;
         } else {
           shouldDelete = true;
+          addLog(_db, "sent journey", journey.data);
         }
       } catch(e: any) {
         shouldDelete = false;

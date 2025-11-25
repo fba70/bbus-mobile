@@ -9,12 +9,12 @@ import { getBusByNumber, getBusesCount, getNewAccessCards, getNewBuses, getNewRo
 import { Link, Redirect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Image, StyleSheet } from "react-native";
+import { Alert, Image, StyleSheet, TouchableOpacity } from "react-native";
 import 'react-native-reanimated';
 
 export default function Main() {
   const { data: session } = authClient.useSession();
-  const [route, setRoute] = useState({} as any);
+  const [route, setRoute] = useState(null as any);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
   const [initialized, setInitialized] = useState(false);
@@ -32,31 +32,13 @@ export default function Main() {
       try {
           const settings = JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
 
-          let vehicleNumber = "";
-          if (settings != null) {
-            const {vehicleNumber: currentVehicleNumber} = settings;
-            if (currentVehicleNumber) {
-              vehicleNumber = currentVehicleNumber;
-            } else {
-              vehicleNumber = "";  
-            }
-          } else {
-            vehicleNumber = "";
-          }
-
-          if (vehicleNumber == null || typeof(vehicleNumber) == "undefined" || vehicleNumber === "") {  
-            Alert.alert("Введите номер автобуса");
-            router.push("/settings");
-            return;
-          }
-
           try {
             const apps = await makeAuthenticatedRequest('applications?userId='+session?.user.id);
             settings.applicationId = apps.length > 0 ? apps[0].id : null;
             SecureStore.setItemAsync("settings", JSON.stringify(settings));
             setConnected(true);
           } catch(e: any) {
-            console.log("нет apps сети", e);
+            console.log("нет сети apps", e);
             setConnected(false);
           }
 
@@ -67,29 +49,26 @@ export default function Main() {
               getNewBuses(_db, session?.user.id);
             }
           } catch(e: any) {
-            console.log("нет buses сети", e);
+            console.log("нет сети buses", e);
             //setConnected(false);
           }
 
-          const _currentBus: any = await getBusByNumber(_db, vehicleNumber);
+          const _currentBus: any = await getBusByNumber(_db, settings.vehicleNumber);
 
           if (_currentBus === null) {
-            Alert.alert("Автобус с номером " + vehicleNumber + " не найден в вашей учетной записи. Пожалуйста, выберите корректный номер автобуса в настройках.");
+            Alert.alert("Автобус с номером " + settings.vehicleNumber + " не найден в вашей учетной записи. Зайдите другим пользователем.");
             router.push("/settings");
             return;
           }
 
           setCurrentBus(_currentBus);
 
-          let routes: any = (await getRoutes(_db)).map((item: any) => JSON.parse(item.data));
+          let routes: any = [];
           try {
-            if (routes.length === 0 ) {
-              routes = await getNewRoutes(_db, session?.user.id);
-            } else {
-              routes = getNewRoutes(_db, session?.user.id);
-            }
+            routes = await getNewRoutes(_db, session?.user.id);
           } catch(e: any) {
-            console.log("нет routes сети", e);
+            routes = (await getRoutes(_db)).map((item: any) => JSON.parse(item.data));
+            console.log("нет сети routes", e);
             //setConnected(false);
           }
 
@@ -106,7 +85,13 @@ export default function Main() {
           }
 
           const currentRoute = routes.filter((route: any) => route.id === _currentBus.routeId);
-          setRoute(currentRoute[0]);
+          if (currentRoute.length === 0) {
+            Alert.alert("Для вашего ТС нет маршрута. Измените номер ТС");
+            router.push("/settings");
+            return;
+          } else {
+            setRoute(currentRoute[0]);
+          }
       } catch (error: any) {
           console.log("Error fetching data:", error);
           Alert.alert("Нет сети, перезагрузите страницу позднее.");
@@ -136,7 +121,9 @@ export default function Main() {
   if (connected === false) {
     return  <ThemedView style={styles.globalContainer}>
               <ThemedView style={styles.textContainer}>
-                <Button title="Перезагрузить" onPress={() => {handleReload()}}/>
+                <TouchableOpacity onPress={() => handleReload()}>
+                  <ThemedText style={styles.redButton}>Перезагрузить</ThemedText>
+                </TouchableOpacity>
               </ThemedView>
             </ThemedView>;
   }
@@ -149,10 +136,12 @@ export default function Main() {
           <IconSymbol size={35}  color="black" name='ellipsis'/>
         </Link>
       </ThemedView>
-      {route != null && route.routeMode === "REGISTRATION" ?
-        <Registration route={route} bus={currentBus} db={db} />
-        :
-        <Authentication route={route} bus={currentBus} db={db}/>
+      {route != null ? 
+        ( route.routeMode === "REGISTRATION" ?
+          <Registration route={route} bus={currentBus} db={db} />
+          :
+          <Authentication route={route} bus={currentBus} db={db}/>
+        ) : ""
       }
     </ThemedView>
   );
@@ -197,5 +186,13 @@ const styles = StyleSheet.create({
     marginTop: '50%',
     width: '100%',
     textAlign: 'center'
-  }
+  },
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
+  },
 });

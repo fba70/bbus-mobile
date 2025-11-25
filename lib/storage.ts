@@ -1,8 +1,11 @@
 import { makeAuthenticatedRequest } from '@/lib/request';
 import * as SQLite from 'expo-sqlite';
+let db: SQLite.SQLiteDatabase | null = null;
 
 export const initDb = async () => {
-    const db = await SQLite.openDatabaseAsync('bbus');
+    if (db == null) {
+        db = await SQLite.openDatabaseAsync('bbus');
+    }
 
     await db.execAsync(`
         PRAGMA journal_mode = WAL;
@@ -10,6 +13,7 @@ export const initDb = async () => {
         CREATE TABLE IF NOT EXISTS route (id VARCHAR(512) PRIMARY KEY NOT NULL, data TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS access_card (id VARCHAR(512) PRIMARY KEY NOT NULL, organizationId VARCHAR(512), cardId VARCHAR(512), data TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS journey (id INTEGER PRIMARY KEY, data TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS log (id INTEGER PRIMARY KEY, message VARCHAR(512), data TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
     `);
 
     return db;
@@ -26,9 +30,10 @@ export const getBusesCount = async (db: SQLite.SQLiteDatabase) => {
 }
 
 export const updateBuses = async (db: SQLite.SQLiteDatabase, buses: any) => {
-    buses.forEach(async (bus: any) => {
+    for (let i in buses) {
+        let bus = buses[i];
         await db.runAsync('INSERT OR REPLACE INTO bus (id, busPlateNumber, routeId, data) VALUES (?, ?, ?, ?)', bus.id, bus.busPlateNumber, bus.routeId, JSON.stringify(bus));
-    });
+    }
 }
 
 export const getRoutes = async (db: SQLite.SQLiteDatabase) => {
@@ -63,8 +68,7 @@ export const postponeJourney = async (db: SQLite.SQLiteDatabase, journey: any) =
 }
 
 export const getJourneys = async (db: SQLite.SQLiteDatabase) => {
-    const journeys = await db.getAllAsync('SELECT * FROM journey WHERE 1');
-    return journeys
+    return await db.getAllAsync('SELECT * FROM journey WHERE 1')
 }
 
 export const deleteJourney = async (db: SQLite.SQLiteDatabase, id: number) => {
@@ -77,8 +81,7 @@ export const getNewBuses = async (db: SQLite.SQLiteDatabase, sessionId: string) 
         console.log(buses.error);
         return;
     }
-    updateBuses(db, buses);
-    return buses;
+    await updateBuses(db, buses);
 }
 
 export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string) => {
@@ -99,4 +102,12 @@ export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: st
     }
     updateAccessCards(db, cards);
     return cards;
+}
+
+export const addLog = async (db: SQLite.SQLiteDatabase, message: string, data: any) => {
+    await db.runAsync('INSERT INTO log (id, message, data) VALUES (NULL, ?, ?)', message, JSON.stringify(data));
+}
+
+export const getLog = async (db: SQLite.SQLiteDatabase) => {
+    return await db.getAllAsync('SELECT * FROM log WHERE 1 ORDER BY created_at DESC LIMIT 0, 100 ');
 }
