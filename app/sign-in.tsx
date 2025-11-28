@@ -37,24 +37,29 @@ export default function SignIn() {
     setPassword(credentials[1]);
     setLoading(true);
 
-    const result = await authClient.signIn.email({
-      email: `${credentials[0]}@b-bus.ru`,
-      password: credentials[1],
-    });
+    try {
+      const result = await authClient.signIn.email({
+        email: `${credentials[0]}@b-bus.ru`,
+        password: credentials[1],
+      });
 
-    setLoading(false);
-    if (result.error) {
-      Alert.alert("Ошибка входа: " + result.error.message);
-    } else {
-      if (settings != null) {
-        settings.vehicleNumber = credentials[0];
+      setLoading(false);
+      if (result.error) {
+        Alert.alert("Ошибка входа: " + result.error.message);
       } else {
-        settings = {"vehicleNumber": credentials[0]};
+        if (settings != null) {
+          settings.vehicleNumber = credentials[0];
+        } else {
+          settings = {"vehicleNumber": credentials[0]};
+        }
+        SecureStore.setItem("settings", JSON.stringify(settings));
+        router.push("/");
       }
-      SecureStore.setItem("settings", JSON.stringify(settings));
-      router.push("/");
+      return;
+    } catch(e: any) {
+      setLoading(false);
+      Alert.alert("Ошибка входа: нет сети");
     }
-    return;
   }
 
   const handleLogin = async () => {

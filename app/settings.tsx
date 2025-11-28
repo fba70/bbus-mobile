@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { clearLog, getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Redirect, router } from "expo-router";
@@ -13,7 +13,8 @@ import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
 export default function Settings() {
-  const [enabledSound, setEnabledSound] = useState(false);
+  const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
+  const [enabledSoundInvalid, setEnabledSoundInvalid] = useState(true);
   const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
   const [audioSuccess, setAudioSuccess] = useState<DocumentPicker.DocumentPickerAsset>();
@@ -36,7 +37,8 @@ export default function Settings() {
       setDb(_db);
       const settings =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
       if (settings != null) {
-        setEnabledSound(settings.enabledSound !== undefined ? settings.enabledSound : enabledSound);
+        setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : enabledSoundSuccess);
+        setEnabledSoundInvalid(settings.enabledSoundInvalid !== undefined ? settings.enabledSoundInvalid : enabledSoundInvalid);
         setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : enabledFrontCamera);
         setDurationNameDisplaying(settings.durationNameDisplaying || durationNameDisplaying);
         setAudioSuccess(settings.audioSuccess || audioSuccess);
@@ -46,7 +48,7 @@ export default function Settings() {
     }
     loadSettings();
 
-  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledSound, initialized, navigation, session]);
+  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledSoundInvalid, enabledSoundSuccess, initialized, navigation, session]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -65,6 +67,7 @@ export default function Settings() {
         }
       } else {
         console.log("Audio selection cancelled.");
+        setAudioSuccess(undefined);
       }
     } catch (error) {
       console.log("Error picking audio:", error);
@@ -89,6 +92,7 @@ export default function Settings() {
         }
       } else {
         console.log("Audio selection cancelled.");
+        setAudioInvalid(undefined);
       }
     } catch (error) {
       console.log("Error picking audio:", error);
@@ -98,10 +102,11 @@ export default function Settings() {
   const handleSave = async () => {
     const settings: any = await SecureStore.getItemAsync("settings");
     if (settings == null) {
-      SecureStore.setItem("settings", JSON.stringify({enabledSound, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
+      SecureStore.setItem("settings", JSON.stringify({enabledSoundSuccess, enabledSoundInvalid, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
     } else {
       const _settings = JSON.parse(settings);
-      _settings.enabledSound = enabledSound;
+      _settings.enabledSoundSuccess = enabledSoundSuccess;
+      _settings.enabledSoundInvalid = enabledSoundInvalid;
       _settings.enabledFrontCamera = enabledFrontCamera;
       _settings.durationNameDisplaying = durationNameDisplaying;
       _settings.audioSuccess = audioSuccess;
@@ -124,8 +129,7 @@ export default function Settings() {
     for (let i in records) {
       rows.push(JSON.stringify(records[i]));
     }
-    Alert.alert("Log", rows.join(`\n\r\n\r`));
-    return;
+    Alert.alert("Log", rows.join(`\n\r\n\r`), [{ 'text': 'Очистить', onPress: () => {clearLog(db)} }, { 'text': 'Закрыть'}]);
   }
 
   const handleUpdateData = () => {
@@ -172,13 +176,6 @@ export default function Settings() {
   return (
     <ThemedView style={styles.globalContainer}>
       <ThemedView style={styles.stepContainer}>
-        <ThemedView style={styles.switchContainer}>
-          <ThemedText>Включить звуковые сигналы</ThemedText>
-          <ThemedSwitch style={styles.switchElement}
-            value={enabledSound}
-            onValueChange={(value) => setEnabledSound(value)}
-          />
-        </ThemedView>
 
         <ThemedView style={styles.switchContainer}>
           <ThemedText>Использовать фронтальную камеру</ThemedText>
@@ -188,11 +185,25 @@ export default function Settings() {
           />
         </ThemedView>
 
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Включить сигнал на считывание</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledSoundSuccess}
+            onValueChange={(value) => setEnabledSoundSuccess(value)}
+          />
+        </ThemedView>
         <ThemedText>Звук для успешного считывания пропуска - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
         <TouchableOpacity onPress={() => pickAudioSuccess()}>
           <ThemedText style={styles.redButton}>Выбрать</ThemedText>
         </TouchableOpacity>
 
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Вкл. сигнал для невалид. пропуска</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledSoundInvalid}
+            onValueChange={(value) => setEnabledSoundInvalid(value)}
+          />
+        </ThemedView>
         <ThemedText>Звук для невалидного пропуска - {audioInvalid? audioInvalid.name: 'Не выбрано'}</ThemedText>
         <TouchableOpacity onPress={() => pickAudioInvalid()}>
           <ThemedText style={styles.redButton}>Выбрать</ThemedText>

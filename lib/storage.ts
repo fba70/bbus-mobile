@@ -30,9 +30,10 @@ export const getBusesCount = async (db: SQLite.SQLiteDatabase) => {
 }
 
 export const updateBuses = async (db: SQLite.SQLiteDatabase, buses: any) => {
+    await db.runAsync('DELETE FROM bus');
     for (let i in buses) {
         let bus = buses[i];
-        await db.runAsync('INSERT OR REPLACE INTO bus (id, busPlateNumber, routeId, data) VALUES (?, ?, ?, ?)', bus.id, bus.busPlateNumber, bus.routeId, JSON.stringify(bus));
+        await db.runAsync('INSERT INTO bus (id, busPlateNumber, routeId, data) VALUES (?, ?, ?, ?)', bus.id, bus.busPlateNumber, bus.routeId, JSON.stringify(bus));
     }
 }
 
@@ -42,13 +43,14 @@ export const getRoutes = async (db: SQLite.SQLiteDatabase) => {
 }
 
 export const updateRoutes = async (db: SQLite.SQLiteDatabase, routes: any) => {
+    await db.runAsync('DELETE FROM route');
     routes.forEach(async (route: any) => {
-        await db.runAsync('INSERT OR REPLACE INTO route (id, data) VALUES (?, ?)', route.id, JSON.stringify(route));
+        await db.runAsync('INSERT INTO route (id, data) VALUES (?, ?)', route.id, JSON.stringify(route));
     });
 }
 
-export const getCardById = async (db: SQLite.SQLiteDatabase, cardId: string) => {
-    const accessCard = await db.getFirstAsync('SELECT * FROM access_card WHERE cardId = ?', cardId);
+export const getCardById = async (db: SQLite.SQLiteDatabase, cardId: string, organizationId: string) => {
+    const accessCard = await db.getFirstAsync('SELECT * FROM access_card WHERE cardId = ? AND organizationId = ? ', cardId, organizationId);
     return accessCard
 }
 
@@ -58,13 +60,14 @@ export const getAccessCards = async (db: SQLite.SQLiteDatabase) => {
 }
 
 export const updateAccessCards = async (db: SQLite.SQLiteDatabase, accessCards: any) => {
+    await db.runAsync('DELETE FROM access_card');
     accessCards.forEach(async (card: any) => {
-        await db.runAsync('INSERT OR REPLACE INTO access_card (id, organizationId, cardId, data) VALUES (?, ?, ?, ?)', card.id, card.organizationId, card.cardId, JSON.stringify(card));
+        await db.runAsync('INSERT INTO access_card (id, organizationId, cardId, data) VALUES (?, ?, ?, ?)', card.id, card.organizationId, card.cardId, JSON.stringify(card));
     });
 }
 
 export const postponeJourney = async (db: SQLite.SQLiteDatabase, journey: any) => {
-    await db.runAsync('INSERT OR REPLACE INTO journey (id, data) VALUES (NULL, ?)', JSON.stringify(journey));
+    await db.runAsync('INSERT INTO journey (id, data) VALUES (NULL, ?)', JSON.stringify(journey));
 }
 
 export const getJourneys = async (db: SQLite.SQLiteDatabase) => {
@@ -106,8 +109,13 @@ export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: st
 
 export const addLog = async (db: SQLite.SQLiteDatabase, message: string, data: any) => {
     await db.runAsync('INSERT INTO log (id, message, data) VALUES (NULL, ?, ?)', message, JSON.stringify(data));
+    await db.runAsync(`DELETE FROM log WHERE id NOT IN ( SELECT id FROM log ORDER BY created_at DESC LIMIT 1000 )`);
 }
 
 export const getLog = async (db: SQLite.SQLiteDatabase) => {
-    return await db.getAllAsync('SELECT * FROM log WHERE 1 ORDER BY created_at DESC LIMIT 0, 100 ');
+    return await db.getAllAsync('SELECT * FROM log WHERE 1 ORDER BY created_at DESC LIMIT 0, 1000');
+}
+
+export const clearLog = async (db: SQLite.SQLiteDatabase) => {
+    await db.runAsync('DELETE FROM log');
 }

@@ -42,7 +42,7 @@ export default function RootLayout() {
         <ThemedView style={styles.globalContainer}>
           <ThemedView style={styles.textContainer}>
             <TouchableOpacity onPress={() => handleReload()}>
-              <ThemedText style={styles.redButton}>Перезагрузить</ThemedText>
+              <ThemedText style={styles.redButton}>Нет сети. Перезагрузить</ThemedText>
             </TouchableOpacity>
           </ThemedView>
         </ThemedView>
@@ -63,8 +63,6 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     top: '50%',
-    marginLeft: 10,
-    marginRight: 10,
     width: '100%',
     position: 'absolute',
   },
@@ -74,6 +72,9 @@ const styles = StyleSheet.create({
     padding: 10,
     fontWeight: 300,
     textAlign: "center",
-    color: 'white'
+    color: 'white',
+    marginLeft: "auto",
+    marginRight: "auto",
+    width: "80%"
   },
 });

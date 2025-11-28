@@ -5,7 +5,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { getBusByNumber, getBusesCount, getNewAccessCards, getNewBuses, getNewRoutes, getRoutes, initDb } from '@/lib/storage';
+import { addLog, getBusByNumber, getBusesCount, getNewAccessCards, getNewBuses, getNewRoutes, getRoutes, initDb } from '@/lib/storage';
 import { Link, Redirect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
@@ -39,6 +39,7 @@ export default function Main() {
             setConnected(true);
           } catch(e: any) {
             console.log("нет сети apps", e);
+            addLog(db, "нет сети apps:", JSON.stringify(e));
             setConnected(false);
           }
 
@@ -50,6 +51,7 @@ export default function Main() {
             }
           } catch(e: any) {
             console.log("нет сети buses", e);
+            addLog(db, "нет сети buses:", JSON.stringify(e));
             //setConnected(false);
           }
 
@@ -69,6 +71,7 @@ export default function Main() {
           } catch(e: any) {
             routes = (await getRoutes(_db)).map((item: any) => JSON.parse(item.data));
             console.log("нет сети routes", e);
+            addLog(db, "нет сети routes:", JSON.stringify(e));
             //setConnected(false);
           }
 
@@ -86,7 +89,7 @@ export default function Main() {
 
           const currentRoute = routes.filter((route: any) => route.id === _currentBus.routeId);
           if (currentRoute.length === 0) {
-            Alert.alert("Для вашего ТС нет маршрута. Измените номер ТС");
+            Alert.alert("Для вашего ТС нет маршрута. Войдите другим пользователем.");
             router.push("/settings");
             return;
           } else {
@@ -94,6 +97,7 @@ export default function Main() {
           }
       } catch (error: any) {
           console.log("Error fetching data:", error);
+          addLog(db, "Error fetching data:", JSON.stringify(error));
           Alert.alert("Нет сети, перезагрузите страницу позднее.");
           setConnected(false);
       } finally {
@@ -102,7 +106,7 @@ export default function Main() {
     };
 
     loadData();
-  }, [initialized, session, session?.user.id]); // Empty dependency array to run once on mount
+  }, [db, initialized, session, session?.user.id]); // Empty dependency array to run once on mount
 
   const handleReload = () => {
     router.push("/");
@@ -123,6 +127,10 @@ export default function Main() {
               <ThemedView style={styles.textContainer}>
                 <TouchableOpacity onPress={() => handleReload()}>
                   <ThemedText style={styles.redButton}>Перезагрузить</ThemedText>
+                </TouchableOpacity>
+                <ThemedView style={styles.gap}></ThemedView>
+                <TouchableOpacity onPress={() => authClient.signOut()}>
+                  <ThemedText style={styles.redButton}>Выйти</ThemedText>
                 </TouchableOpacity>
               </ThemedView>
             </ThemedView>;
@@ -166,6 +174,12 @@ const styles = StyleSheet.create({
     height: "auto",
     width: "60%",
   },
+  gap: {
+    height: 10,
+    width: "100%",
+    marginTop: 10,
+    marginBottom: 10,
+  },
   headerIcon: {
     display: "flex",
     verticalAlign: "middle",
@@ -177,8 +191,6 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     top: '50%',
-    marginLeft: 10,
-    marginRight: 10,
     width: '100%',
     position: 'absolute',
   },
@@ -193,6 +205,9 @@ const styles = StyleSheet.create({
     padding: 10,
     fontWeight: 300,
     textAlign: "center",
-    color: 'white'
+    color: 'white',
+    marginLeft: "auto",
+    marginRight: "auto",
+    width: "80%"
   },
 });

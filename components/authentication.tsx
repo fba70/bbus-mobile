@@ -19,7 +19,8 @@ export default function Authentication(props: any) {
     const { data: session } = authClient.useSession();
     const [passKeyBoxColor, setPassKeyBoxColor] = useState('#F3F4F6');
     const [initialized, setInitialized] = useState(false);
-    const [enabledSound, setEnabledSound] = useState(true);
+    const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
+    const [enabledSoundInvalid, setEnabledSoundInvalid] = useState(true);
     const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
     const [audioSuccess, setAudioSuccess] = useState(undefined);
     const [audioInvalid, setAudioInvalid] = useState(undefined);
@@ -28,8 +29,8 @@ export default function Authentication(props: any) {
     const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
-    let audioSuccessPlayer = useAudioPlayer(audioSuccess);
-    let audioInvalidPlayer = useAudioPlayer(audioInvalid);
+    let audioSuccessPlayer = useAudioPlayer(audioSuccess === undefined ? require("@/assets/audios/crystalring.mp3") : audioSuccess);
+    let audioInvalidPlayer = useAudioPlayer(audioInvalid === undefined ? require("@/assets/audios/zvuk-nevernogo-otveta-sto-k-odnomu.mp3") : audioInvalid);
     const inputRef = useRef(ThemedTextInput);
 
     useEffect(() => {
@@ -39,7 +40,8 @@ export default function Authentication(props: any) {
         try {
             const settings = JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
             if (settings != null) {
-              setEnabledSound(settings.enabledSound);
+              setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : true);
+              setEnabledSoundInvalid(settings.enabledSoundInvalid !== undefined ? settings.enabledSoundInvalid : true);
               setAudioSuccess(settings.audioSuccess);
               setAudioInvalid(settings.audioInvalid);
               setEnabledFrontCamera(settings.enabledFrontCamera);
@@ -73,26 +75,30 @@ export default function Authentication(props: any) {
     }, [audioInvalid, audioSuccess, enabledFrontCamera, initialized, lastConnectedTime]);
 
     const handleQrScanned = async (data: any) => {
+      if (handlingCard) return;
+      setHandlingCard(true);
       setPassengerName(data);
       setTimeout(() => {
         setPassengerName("");
       }, 500);
-      handleCard(data);
+      handleCard(data, "QR_CODE");
     };
 
     const handleCardFromKeyboard = async (data: any) => {
-      setPassengerName(data);
       setTimeout(() => {
         setPassengerName("");
         inputRef.current.clear();
       }, 500);
-      handleCard(data);
-    }
-
-    const handleCard = async (cardId: string) => {
       if (handlingCard) return;
       setHandlingCard(true);
-      const сard: any = await getCardById(props.db, cardId);
+      setPassengerName(data);
+      handleCard(data, "RFID");
+    }
+
+    const handleCard = async (cardId: string, cardType: string) => {
+      addLog(props.db, "handle card by authentication mode", JSON.stringify({cardId, cardType}));
+
+      const сard: any = await getCardById(props.db, cardId, props.route.organization.id);
       if (сard == null) {
         setPassengerName("");
         setPassKeyBoxColor('red');
@@ -100,7 +106,7 @@ export default function Authentication(props: any) {
           setPassKeyBoxColor('#F3F4F6');
           setHandlingCard(false);
         }, 1000);
-        if (enabledSound) {
+        if (enabledSoundInvalid) {
           audioInvalidPlayer.play();
           setTimeout(() => {
             audioInvalidPlayer.pause();
@@ -113,7 +119,7 @@ export default function Authentication(props: any) {
       const settings: any = await SecureStore.getItemAsync("settings");
 
       if (settings == null || !(JSON.parse(settings).applicationId)) {
-        Alert.alert("Настройки не найдены. Перейдите в настройки и заполните их.");
+        Alert.alert("Настройки не найдены. Обновление данных.");
         router.push("/");
         return;
       }
@@ -134,7 +140,7 @@ export default function Authentication(props: any) {
         if (result?.error) {
           postponeJourney(props.db, journey);
         } else {
-          addLog(props.db, "sent journey", JSON.stringify(journey));
+          addLog(props.db, "sent journey authentication", JSON.stringify(journey));
         }
       } catch(e: any) {
         postponeJourney(props.db, journey);
@@ -147,7 +153,7 @@ export default function Authentication(props: any) {
         setHandlingCard(false);
         setPassengerName("");
       }, parseInt(JSON.parse(settings).durationNameDisplaying)* 1000);
-      if (enabledSound) {
+      if (enabledSoundSuccess) {
         audioSuccessPlayer.play();
         setTimeout(() => {
           audioSuccessPlayer.pause();
@@ -174,20 +180,20 @@ export default function Authentication(props: any) {
 
     return <ThemedView style={styles.globalContainer} tabIndex={-1}>
               <ThemedTextInput ref={inputRef} tabIndex={0} autoFocus={true} showSoftInputOnFocus={false} inp accessible={false}
-                onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 1000)}
+                onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 100)}
                 style={styles.cardFromKeyboard} onBlur={() => { Keyboard.dismiss(); inputRef.current.focus();}} />
               <ThemedView style={styles.clientHeader} tabIndex={-1}>
-                <ThemedText style={styles.textContainer}>{props.route.organization.name}</ThemedText>
-                <ThemedText style={[styles.textContainer, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
+                <ThemedText style={styles.textContainerBold}>{props.route.organization.name}</ThemedText>
+                <ThemedText style={[styles.textContainerBold, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
               </ThemedView>
               <ThemedView style={[styles.passKeyBox, {backgroundColor: passKeyBoxColor}]} tabIndex={-1}>
                 {showQr === false ? 
                   <ThemedView style={{backgroundColor: "transparent"}}>
                     <Image source={require("@/assets/images/hotpot.png")} style={styles.hotpot}/>
-                    <ThemedText style={styles.attachPasskey}>Приложите пропуск или покажите в камеру QR код</ThemedText>
+                    <ThemedText style={styles.attachPasskey}>Приложите карту к считывателю или покажите QR код</ThemedText>
                     {logo !== "" 
                     ?
-                        <Image source={`data:${signature};base64,${logo}`} style={styles.logo}/>
+                        <Image source={`data:${signature};base64,${logo}`} contentFit='contain' style={styles.logo}/>
                     :
                         <Image source={require("@/assets/images/Logo_BBUS.webp")} style={styles.logo}/>
                     }
@@ -216,6 +222,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 20,
     marginBottom: 8,
+  },
+  textContainerBold: {
+    textAlign: 'center',
+    fontSize: 24,
+    marginBottom: 8,
+    textTransform: "uppercase"
   },
   hotpot: {
     marginLeft: 'auto',
@@ -273,7 +285,9 @@ const styles = StyleSheet.create({
     color: "#99A1AF",
     textAlign: "center",
     marginTop: 30,
-    paddingTop: 20
+    paddingTop: 20,
+    textTransform: "uppercase",
+    fontSize: 24,
   },
   cardFromKeyboard: {
     position: 'absolute',

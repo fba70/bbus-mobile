@@ -19,16 +19,15 @@ export default function Registration(props: any) {
     const { data: session } = authClient.useSession();
     const [passKeyBoxColor, setPassKeyBoxColor] = useState('#F3F4F6');
     const [initialized, setInitialized] = useState(false);
-    const [enabledSound, setEnabledSound] = useState(true);
+    const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
     const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
     const [audioSuccess, setAudioSuccess] = useState(undefined);
-    const [audioInvalid, setAudioInvalid] = useState(undefined);
     const [passengerName, setPassengerName] = useState("");
     const [showQr, setShowQr] = useState(false);
     const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
-    let audioSuccessPlayer = useAudioPlayer(audioSuccess);
+    let audioSuccessPlayer = useAudioPlayer(audioSuccess === undefined ? require("@/assets/audios/crystalring.mp3") : audioSuccess);
     const inputRef = useRef(ThemedTextInput);
 
     useEffect(() => {
@@ -38,9 +37,8 @@ export default function Registration(props: any) {
         try {
             const settings = JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
             if (settings != null) {
-              setEnabledSound(settings.enabledSound);
+              setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : true);
               setAudioSuccess(settings.audioSuccess);
-              setAudioInvalid(settings.audioInvalid);
               setEnabledFrontCamera(settings.enabledFrontCamera);
             }
         } catch(e: any) {
@@ -69,9 +67,11 @@ export default function Registration(props: any) {
 
       getLastConnectedTime();
 
-    }, [audioInvalid, audioSuccess, enabledFrontCamera, initialized, lastConnectedTime]);
+    }, [audioSuccess, enabledFrontCamera, initialized, lastConnectedTime]);
 
     const handleQrScanned = async (data: any) => {
+      if (handlingCard) return;
+      setHandlingCard(true);
       setPassengerName(data);
       setTimeout(() => {
         setPassengerName("");
@@ -80,22 +80,23 @@ export default function Registration(props: any) {
     };
 
     const handleCardFromKeyboard = async (data: any) => {
-      setPassengerName(data);
       setTimeout(() => {
         setPassengerName("");
         inputRef.current.clear();
       }, 500);
+      if (handlingCard) return;
+      setHandlingCard(true);
+      setPassengerName(data);
       handleCard(data, "RFID");
     }
 
     const handleCard = async (cardId: string, cardType: string) => {
-      if (handlingCard) return;
-      setHandlingCard(true);
-      
       const settings: any = await SecureStore.getItemAsync("settings");
 
+      addLog(props.db, "handle card by registration mode", JSON.stringify({cardId, cardType}));
+
       if (settings == null || !(JSON.parse(settings).applicationId)) {
-        Alert.alert("Настройки не найдены. Перейдите в настройки и заполните их.");
+        Alert.alert("Настройки не найдены. Обновление данных.");
         router.push("/");
         return;
       }
@@ -110,7 +111,7 @@ export default function Registration(props: any) {
                           applicationId: (JSON.parse(settings).applicationId)
                         } as any;
 
-      const сard: any = await getCardById(props.db, cardId);
+      const сard: any = await getCardById(props.db, cardId, props.route.organization.id);
       if (сard == null) {
         journey.accessCardId = "acebbd7a-e282-4aeb-8631-c49e93d230a1";
         journey.newCardId = cardId;
@@ -124,7 +125,7 @@ export default function Registration(props: any) {
         if (result?.error) {
           postponeJourney(props.db, journey);
         } else {
-          addLog(props.db, "sent journey", JSON.stringify(journey));
+          addLog(props.db, "sent journey registration", JSON.stringify(journey));
         }
       } catch(e: any) {
         postponeJourney(props.db, journey);
@@ -135,12 +136,12 @@ export default function Registration(props: any) {
         setPassKeyBoxColor('#F3F4F6');
         setHandlingCard(false);
       }, 1000);
-      if (enabledSound) {
+      if (enabledSoundSuccess) {
         audioSuccessPlayer.play();
         setTimeout(() => {
           audioSuccessPlayer.pause();
           audioSuccessPlayer.seekTo(0);
-        }, 1000);
+        }, 3000);
       }
     }
 
@@ -162,20 +163,20 @@ export default function Registration(props: any) {
 
     return <ThemedView style={styles.globalContainer} tabIndex={-1}>
               <ThemedTextInput ref={inputRef} tabIndex={0} autoFocus={true} showSoftInputOnFocus={false} accessible={false}
-                onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 1000)}
+                onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 100)}
                 style={styles.cardFromKeyboard} onBlur={() => { Keyboard.dismiss(); inputRef.current.focus(); }} />
               <ThemedView style={styles.clientHeader} tabIndex={-1}>
-                <ThemedText style={styles.textContainer}>{props.route.organization.name}</ThemedText>
-                <ThemedText style={[styles.textContainer, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
+                <ThemedText style={styles.textContainerBold}>{props.route.organization.name}</ThemedText>
+                <ThemedText style={[styles.textContainerBold, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
               </ThemedView>
               <ThemedView style={[styles.passKeyBox, {backgroundColor: passKeyBoxColor}]} tabIndex={-1}>
                 {showQr === false ? 
                   <ThemedView style={{backgroundColor: "transparent"}}>
                     <Image source={require("@/assets/images/hotpot.png")} style={styles.hotpot}/>
-                    <ThemedText style={styles.attachPasskey}>Приложите пропуск или покажите в камеру QR код</ThemedText>
+                    <ThemedText style={styles.attachPasskey}>Приложите карту к считывателю или покажите QR код</ThemedText>
                     {logo !== "" 
                     ?
-                        <Image source={`data:${signature};base64,${logo}`} style={styles.logo}/>
+                        <Image source={`data:${signature};base64,${logo}`} contentFit='contain' style={styles.logo}/>
                     :
                         <Image source={require("@/assets/images/Logo_BBUS.webp")} style={styles.logo}/>
                     }
@@ -204,6 +205,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 20,
     marginBottom: 8,
+  },
+  textContainerBold: {
+    textAlign: 'center',
+    fontSize: 24,
+    marginBottom: 8,
+    textTransform: "uppercase"
   },
   hotpot: {
     marginLeft: 'auto',
@@ -261,7 +268,10 @@ const styles = StyleSheet.create({
     color: "#99A1AF",
     textAlign: "center",
     marginTop: 30,
-    paddingTop: 20
+    paddingTop: 20,
+    textTransform: "uppercase",
+    fontSize: 24,
+    
   },
   cardFromKeyboard: {
     position: 'absolute',

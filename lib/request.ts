@@ -8,7 +8,7 @@ export const makeAuthenticatedRequest = async (api_path: string, body?: BodyInit
   if (body) {
     headers["Content-Type"] = "application/json";
   }
-  const response = await fetch("https://bbus-admin.vercel.app/api/" + api_path, { 
+  const response = await fetch(process.env.EXPO_PUBLIC_API_URL + "api/" + api_path, { 
     headers,
     // 'include' can interfere with the cookies we just set manually in the headers
     credentials: "omit",
