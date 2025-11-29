@@ -5,15 +5,15 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { addLog, getBusByNumber, getBusesCount, getNewAccessCards, getNewBuses, getNewRoutes, getRoutes, initDb } from '@/lib/storage';
-import { Link, Redirect, router } from 'expo-router';
+import { addLog, deleteJourney, getBusByNumber, getBusesCount, getJourneys, getNewAccessCards, getNewBuses, getNewRoutes, getRoutes, initDb } from '@/lib/storage';
+import { Link, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, TouchableOpacity } from "react-native";
 import 'react-native-reanimated';
 
 export default function Main() {
-  const { data: session } = authClient.useSession();
+  const [session, setSession] = useState(null);
   const [route, setRoute] = useState(null as any);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
@@ -22,11 +22,15 @@ export default function Main() {
   const [currentBus, setCurrentBus] = useState(null as any);
 
   useEffect(() => {
-    if (session == null) return;
-
     const loadData = async () => {
       if (initialized) return;
       setInitialized(true);
+      const {data: session} = await authClient.getSession();
+      setSession(session as any);
+      if (session == null) {
+        router.replace("/sign-in");
+        return;
+      }
       const _db = await initDb();
       setDb(_db);
       try {
@@ -77,6 +81,29 @@ export default function Main() {
 
           getNewAccessCards(_db, session?.user.id);
 
+          const sendPostponedJourneys = async () => {
+            const journeys = await getJourneys(_db);
+            journeys.map(async (journey: any) => {
+              let shouldDelete: boolean = false;
+              try {
+                const result = await makeAuthenticatedRequest('journeys', journey.data, "POST");
+                if (result?.error) {
+                  shouldDelete = false;
+                } else {
+                  shouldDelete = true;
+                  addLog(_db, "sent journey", journey.data);
+                }
+              } catch(e: any) {
+                shouldDelete = false;
+              }
+              if (shouldDelete) {
+                await deleteJourney(_db, journey.id);
+              }
+            });
+          }
+
+          sendPostponedJourneys();
+
           let timeSlots = JSON.parse(_currentBus.data).timeSlots;
           if (timeSlots?.length > 0) {
             timeSlots.map((slot: any) => {
@@ -106,14 +133,10 @@ export default function Main() {
     };
 
     loadData();
-  }, [db, initialized, session, session?.user.id]); // Empty dependency array to run once on mount
+  }, [db, initialized, session]); // Empty dependency array to run once on mount
 
   const handleReload = () => {
     router.push("/");
-  }
-
-  if (session == null) {
-    return <Redirect href="/sign-in" />;
   }
 
   if (loading) {

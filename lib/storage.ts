@@ -78,7 +78,7 @@ export const deleteJourney = async (db: SQLite.SQLiteDatabase, id: number) => {
     await db.getAllAsync('DELETE FROM journey WHERE id = ?', id);
 }
 
-export const getNewBuses = async (db: SQLite.SQLiteDatabase, sessionId: string) => {
+export const getNewBuses = async (db: SQLite.SQLiteDatabase, sessionId: string | undefined) => {
     let buses = await makeAuthenticatedRequest('buses?userId='+sessionId);
     if (buses?.error) {
         console.log(buses.error);
@@ -87,7 +87,7 @@ export const getNewBuses = async (db: SQLite.SQLiteDatabase, sessionId: string) 
     await updateBuses(db, buses);
 }
 
-export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string) => {
+export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string | undefined) => {
     let routes = await makeAuthenticatedRequest('routes?userId='+sessionId);
     if (routes?.error) {
         console.log(routes.error);
@@ -97,7 +97,7 @@ export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string) 
     return routes;
 }
 
-export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: string) => {
+export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: string | undefined) => {
     const cards = await makeAuthenticatedRequest('access-cards?userId='+sessionId);
     if (cards?.error) {
         console.log(cards.error);

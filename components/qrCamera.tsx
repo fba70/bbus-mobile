@@ -13,7 +13,6 @@ export default function QrCamera(props: { onQrScanned: (arg0: string) => void; c
 
   return (
     <ThemedView style={[{ paddingTop: insets.top, ...styleSheet.container }, props.containerStyle]}>
-
       {isPermissionGranted ? 
         <CameraView
             style={styleSheet.camStyle}

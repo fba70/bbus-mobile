@@ -3,7 +3,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { authClient } from "@/lib/auth-client";
-import "@/lib/cron";
+import { registerBackgroundTaskAsync } from "@/lib/cron";
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,15 +15,13 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [connected, setConnected] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  registerBackgroundTaskAsync();
   useEffect(() => {
     const loadSession = async () => {
       if (initialized) return;
       setInitialized(true);
       try {
-        const { data: session } = await authClient.getSession();
-        if (session == null) {
-          router.push('/sign-in');
-        }
+        await authClient.getSession();
       } catch(e: any) {
         console.log('Error loading session:', e.message);
         setConnected(false);
@@ -33,7 +31,7 @@ export default function RootLayout() {
   }, [initialized]);
   
   const handleReload = () => {
-    router.push("/");
+    router.replace("/");
   }
 
   return (

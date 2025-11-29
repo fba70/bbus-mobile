@@ -10,8 +10,9 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
-export default function SignIn() {
-  const { data: session } = authClient.useSession();
+export default function Index() {
+  const [session, setSession] = useState(null);
+  const [initialized, setInitialized] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,14 @@ export default function SignIn() {
       navigation.setOptions({
         title: 'Вход',
       });
-  });
+      const checkSession = async () => {
+         if (initialized) return;
+        const {data: session} = await authClient.getSession();
+        setSession(session as any);
+        setInitialized(true);
+      }
+      checkSession();
+  }, [initialized, navigation]);
 
   const openQrCodeCamera = () => {
     setShowQr(true);
@@ -31,19 +39,18 @@ export default function SignIn() {
   const handleQrScanned = async(data: any) => {
     setShowQr(false);
     if (loading === true) return;
+    setLoading(true);
     let settings: any =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
     let credentials = data.split('^');
-    setEmail(credentials[0]+"@b-bus.ru");
+    setEmail(credentials[0]+"@bbus.ru");
     setPassword(credentials[1]);
-    setLoading(true);
 
     try {
       const result = await authClient.signIn.email({
-        email: `${credentials[0]}@b-bus.ru`,
+        email: `${credentials[0]}@bbus.ru`,
         password: credentials[1],
       });
 
-      setLoading(false);
       if (result.error) {
         Alert.alert("Ошибка входа: " + result.error.message);
       } else {
@@ -57,27 +64,50 @@ export default function SignIn() {
       }
       return;
     } catch(e: any) {
-      setLoading(false);
       Alert.alert("Ошибка входа: нет сети");
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
     }
   }
 
   const handleLogin = async () => {
+    if (loading === true) return;
     setLoading(true);
-    const result = await authClient.signIn.email({
-      email,
-      password,
-    });
+    let settings: any =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
 
-    setLoading(false);
-    if (result.error) {
-      Alert.alert("Ошибка входа: " + result.error.message);
-    } else {
-      router.push("/");
+    try {
+      const result = await authClient.signIn.email({
+        email,
+        password,
+      });
+
+      if (result.error) {
+        Alert.alert("Ошибка входа: " + result.error.message);
+      } else {
+        if (settings != null) {
+          settings.vehicleNumber = email.replace("@bbus.ru", "");
+        } else {
+          settings = {"vehicleNumber": email.replace("@bbus.ru", "")};
+        }
+        SecureStore.setItem("settings", JSON.stringify(settings));
+        router.push("/");
+      }
+    } catch(e: any) {
+      Alert.alert("Ошибка входа: нет сети");
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
     }
   };
+  
+  if (!initialized) {
+    return <ThemedText></ThemedText>;
+  }
 
-  if (session !== null) {
+  if (session !== null && initialized) {
     return <Redirect href="/" />;
   }
   
@@ -93,11 +123,11 @@ export default function SignIn() {
           value={email}
           onChangeText={(value) => setEmail(value)}
         />
-
+{/*
         <TouchableOpacity onPress={() => openQrCodeCamera()}>
           <ThemedText style={styles.greenButton}>Сканировать</ThemedText>
         </TouchableOpacity>
-
+*/}
         <ThemedTextInput
           placeholder="Пароль"
           value={password}

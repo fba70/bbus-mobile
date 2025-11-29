@@ -22,6 +22,7 @@ export default function Authentication(props: any) {
     const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
     const [enabledSoundInvalid, setEnabledSoundInvalid] = useState(true);
     const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
+    const [enabledQRCode, setEnabledQRCode] = useState(false);
     const [audioSuccess, setAudioSuccess] = useState(undefined);
     const [audioInvalid, setAudioInvalid] = useState(undefined);
     const [passengerName, setPassengerName] = useState("");
@@ -44,7 +45,8 @@ export default function Authentication(props: any) {
               setEnabledSoundInvalid(settings.enabledSoundInvalid !== undefined ? settings.enabledSoundInvalid : true);
               setAudioSuccess(settings.audioSuccess);
               setAudioInvalid(settings.audioInvalid);
-              setEnabledFrontCamera(settings.enabledFrontCamera);
+              setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : true);
+              setEnabledQRCode(settings.enabledQRCode !== undefined ? settings.enabledQRCode : false);
             }
         } catch(e: any) {
           console.log(e);
@@ -98,14 +100,53 @@ export default function Authentication(props: any) {
     const handleCard = async (cardId: string, cardType: string) => {
       addLog(props.db, "handle card by authentication mode", JSON.stringify({cardId, cardType}));
 
-      const сard: any = await getCardById(props.db, cardId, props.route.organization.id);
-      if (сard == null) {
+      const settings: any = await SecureStore.getItemAsync("settings");
+
+      if (settings == null || !(JSON.parse(settings).applicationId)) {
+        Alert.alert("Настройки не найдены. Обновление данных.");
+        router.push("/");
+        return;
+      }
+
+      const card: any = await getCardById(props.db, cardId, props.route.organization.id);
+
+      if (card == null || (card != null && JSON.parse(card.data).cardStatus === "INACTIVE")) { 
         setPassengerName("");
         setPassKeyBoxColor('red');
         setTimeout(() => {
           setPassKeyBoxColor('#F3F4F6');
           setHandlingCard(false);
         }, 1000);
+
+        const journey = {   sessionUserId: session?.user.id,
+                            routeId: props.route.id,
+                            journeyTimeStamp: new Date().toISOString(),
+                            coordinatesLattitude: location?.coords.latitude,
+                            coordinatesLongitude: location?.coords.longitude,
+                            journeyStatus: "AUTHORIZATION_FAILED", //| "REGISTRATION_ERROR" | "AUTHORIZATION_OK" | "AUTHORIZATION_FAILED" | "AUTHORIZATION_ERROR" | null
+                            busId: props.bus.id,
+                            applicationId: (JSON.parse(settings).applicationId)
+                          } as any;
+
+        if (card == null) {
+          journey.accessCardId = "acebbd7a-e282-4aeb-8631-c49e93d230a1";
+          journey.newCardId = cardId;
+          journey.newCardType = cardType; //"NFC", "RFID", "QR_CODE")
+        } else {
+          journey.accessCardId = card.id;
+        }
+
+        try {
+          const result = await makeAuthenticatedRequest('journeys', JSON.stringify(journey), "POST");
+          if (result?.error) {
+            postponeJourney(props.db, journey);
+          } else {
+            addLog(props.db, "sent journey registration", JSON.stringify(journey));
+          }
+        } catch(e: any) {
+          postponeJourney(props.db, journey);
+        }
+
         if (enabledSoundInvalid) {
           audioInvalidPlayer.play();
           setTimeout(() => {
@@ -116,21 +157,13 @@ export default function Authentication(props: any) {
         return;
       }
 
-      const settings: any = await SecureStore.getItemAsync("settings");
-
-      if (settings == null || !(JSON.parse(settings).applicationId)) {
-        Alert.alert("Настройки не найдены. Обновление данных.");
-        router.push("/");
-        return;
-      }
-
       const journey = {   sessionUserId: session?.user.id,
                           routeId: props.route.id,
                           journeyTimeStamp: new Date().toISOString(),
                           coordinatesLattitude: location?.coords.latitude,
                           coordinatesLongitude: location?.coords.longitude,
                           journeyStatus: "AUTHORIZATION_OK", // "AUTHORIZATION_FAILED"
-                          accessCardId: сard.id,
+                          accessCardId: card.id,
                           busId: props.bus.id,
                           applicationId: (JSON.parse(settings).applicationId)
                         };
@@ -147,7 +180,7 @@ export default function Authentication(props: any) {
       }
 
       setPassKeyBoxColor('green');
-      setPassengerName(JSON.parse(сard.data).nameOnCard);
+      setPassengerName(JSON.parse(card.data).nameOnCard);
       setTimeout(() => {
         setPassKeyBoxColor('#F3F4F6');
         setHandlingCard(false);
@@ -189,8 +222,7 @@ export default function Authentication(props: any) {
               <ThemedView style={[styles.passKeyBox, {backgroundColor: passKeyBoxColor}]} tabIndex={-1}>
                 {showQr === false ? 
                   <ThemedView style={{backgroundColor: "transparent"}}>
-                    <Image source={require("@/assets/images/hotpot.png")} style={styles.hotpot}/>
-                    <ThemedText style={styles.attachPasskey}>Приложите карту к считывателю или покажите QR код</ThemedText>
+                    <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.attachPasskey}>Приложите карту к считывателю {enabledQRCode ? "или покажите QR код": ""}</ThemedText>
                     {logo !== "" 
                     ?
                         <Image source={`data:${signature};base64,${logo}`} contentFit='contain' style={styles.logo}/>
@@ -201,17 +233,26 @@ export default function Authentication(props: any) {
                 : 
                   null
                 }
-                <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={enabledFrontCamera ? "front": "back"} />
-                <ThemedText style={styles.textPassengerName}>{passengerName ? passengerName: "ФИО сотрудника"}</ThemedText>
+                {
+                  enabledQRCode ? 
+                    <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={enabledFrontCamera ? "front": "back"} />
+                  :
+                    ""
+                }
+                <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.textPassengerName}>{passengerName ? passengerName: ""}</ThemedText>
               </ThemedView>
-              {
-                <ThemedView tabIndex={-1}>
-                  <TouchableOpacity onPress={() => setShowQr(!showQr)}>
-                    <ThemedText style={styles.redButton}>{`${!showQr ? "Показать" : "Скрыть"} видео с камеры для Qr кода`}</ThemedText>
-                  </TouchableOpacity>
-                </ThemedView>
+              { enabledQRCode ?
+                  <ThemedView tabIndex={-1}>
+                    <TouchableOpacity onPress={() => setShowQr(!showQr)}>
+                      <ThemedText style={styles.greyButton}>{`${!showQr ? "Показать" : "Скрыть"} картинку для QR`}</ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
+                :
+                  ""
               }
+              <ThemedText style={styles.bottomText}>{session?.user.name}</ThemedText>
             </ThemedView>
+            
 }
 
 //<ThemedText style={styles.textContainer}>Режим работы: Авторизация.</ThemedText>
@@ -272,9 +313,9 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginLeft: 'auto',
     marginRight: 'auto',
-    width: 100,
-    height: 100,
-    borderWidth: 1,
+    width: 200,
+    height: 200,
+    borderWidth: 0,
     borderRadius: 10,
     borderColor: '#D1D5DC',
     objectFit: "contain"
@@ -293,14 +334,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: -1000
   },
-  redButton: {
-    backgroundColor: "#DC2626",
+  greyButton: {
+    backgroundColor: "#E5E7EB",
     borderRadius: 10,
     padding: 10,
-    marginLeft: 20,
-    marginRight: 20,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 300,
     fontWeight: 300,
     textAlign: "center",
-    color: 'white'
+    color: '#000000'
+  },
+  bottomText: {
+    marginTop: 50,
+    textAlign: "center",
+    width: "100%",
   }
 });

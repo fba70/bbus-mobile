@@ -21,6 +21,7 @@ export default function Registration(props: any) {
     const [initialized, setInitialized] = useState(false);
     const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
     const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
+    const [enabledQRCode, setEnabledQRCode] = useState(false);
     const [audioSuccess, setAudioSuccess] = useState(undefined);
     const [passengerName, setPassengerName] = useState("");
     const [showQr, setShowQr] = useState(false);
@@ -39,7 +40,8 @@ export default function Registration(props: any) {
             if (settings != null) {
               setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : true);
               setAudioSuccess(settings.audioSuccess);
-              setEnabledFrontCamera(settings.enabledFrontCamera);
+              setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : true);
+              setEnabledQRCode(settings.enabledQRCode !== undefined ? settings.enabledQRCode : false);
             }
         } catch(e: any) {
           console.log(e);
@@ -172,8 +174,7 @@ export default function Registration(props: any) {
               <ThemedView style={[styles.passKeyBox, {backgroundColor: passKeyBoxColor}]} tabIndex={-1}>
                 {showQr === false ? 
                   <ThemedView style={{backgroundColor: "transparent"}}>
-                    <Image source={require("@/assets/images/hotpot.png")} style={styles.hotpot}/>
-                    <ThemedText style={styles.attachPasskey}>Приложите карту к считывателю или покажите QR код</ThemedText>
+                    <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.attachPasskey}>Приложите карту к считывателю {enabledQRCode ? "или покажите QR код": ""}</ThemedText>
                     {logo !== "" 
                     ?
                         <Image source={`data:${signature};base64,${logo}`} contentFit='contain' style={styles.logo}/>
@@ -184,16 +185,24 @@ export default function Registration(props: any) {
                 : 
                   null
                 }
-                <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={enabledFrontCamera ? "front": "back"} />
-                <ThemedText style={styles.textPassengerName}>{passengerName ? passengerName: "ФИО сотрудника"}</ThemedText>
+                {
+                  enabledQRCode ? 
+                    <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={enabledFrontCamera ? "front": "back"} />
+                  :
+                    ""
+                }
+                <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.textPassengerName}>{passengerName ? passengerName: ""}</ThemedText>
               </ThemedView>
-              {
-                <ThemedView tabIndex={-1}>
-                  <TouchableOpacity onPress={() => setShowQr(!showQr)}>
-                    <ThemedText style={styles.redButton}>{`${!showQr ? "Показать" : "Скрыть"} видео с камеры для Qr кода`}</ThemedText>
-                  </TouchableOpacity>
-                </ThemedView>
+              { enabledQRCode ?
+                  <ThemedView tabIndex={-1}>
+                    <TouchableOpacity onPress={() => setShowQr(!showQr)}>
+                      <ThemedText style={styles.greyButton}>{`${!showQr ? "Показать" : "Скрыть"} картинку для QR`}</ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
+                :
+                  ""
               }
+              <ThemedText style={styles.bottomText}>{session?.user.name}</ThemedText>
             </ThemedView>
 }
 
@@ -255,9 +264,9 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginLeft: 'auto',
     marginRight: 'auto',
-    width: 100,
-    height: 100,
-    borderWidth: 1,
+    width: 200,
+    height: 200,
+    borderWidth: 0,
     borderRadius: 10,
     borderColor: '#D1D5DC',
     objectFit: "contain"
@@ -271,20 +280,25 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     textTransform: "uppercase",
     fontSize: 24,
-    
   },
   cardFromKeyboard: {
     position: 'absolute',
     left: -1000
   },
-  redButton: {
-    backgroundColor: "#DC2626",
+  greyButton: {
+    backgroundColor: "#E5E7EB",
     borderRadius: 10,
     padding: 10,
-    marginLeft: 20,
-    marginRight: 20,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 300,
     fontWeight: 300,
     textAlign: "center",
-    color: 'white'
+    color: '#000000'
+  },
+  bottomText: {
+    marginTop: 50,
+    textAlign: "center",
+    width: "100%",
   }
 });

@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { clearLog, getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { addLog, clearLog, deleteJourney, getJourneys, getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Redirect, router } from "expo-router";
@@ -15,6 +15,7 @@ import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 export default function Settings() {
   const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
   const [enabledSoundInvalid, setEnabledSoundInvalid] = useState(true);
+  const [enabledQRCode, setEnabledQRCode] = useState(false);
   const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
   const [audioSuccess, setAudioSuccess] = useState<DocumentPicker.DocumentPickerAsset>();
@@ -39,6 +40,7 @@ export default function Settings() {
       if (settings != null) {
         setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : enabledSoundSuccess);
         setEnabledSoundInvalid(settings.enabledSoundInvalid !== undefined ? settings.enabledSoundInvalid : enabledSoundInvalid);
+        setEnabledQRCode(settings.enabledQRCode !== undefined ? settings.enabledQRCode : enabledQRCode);
         setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : enabledFrontCamera);
         setDurationNameDisplaying(settings.durationNameDisplaying || durationNameDisplaying);
         setAudioSuccess(settings.audioSuccess || audioSuccess);
@@ -48,7 +50,8 @@ export default function Settings() {
     }
     loadSettings();
 
-  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledSoundInvalid, enabledSoundSuccess, initialized, navigation, session]);
+  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledQRCode, enabledSoundInvalid, enabledSoundSuccess,
+      initialized, navigation, session]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -102,11 +105,12 @@ export default function Settings() {
   const handleSave = async () => {
     const settings: any = await SecureStore.getItemAsync("settings");
     if (settings == null) {
-      SecureStore.setItem("settings", JSON.stringify({enabledSoundSuccess, enabledSoundInvalid, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
+      SecureStore.setItem("settings", JSON.stringify({enabledSoundSuccess, enabledQRCode, enabledSoundInvalid, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
     } else {
       const _settings = JSON.parse(settings);
       _settings.enabledSoundSuccess = enabledSoundSuccess;
       _settings.enabledSoundInvalid = enabledSoundInvalid;
+      _settings.enabledQRCode = enabledQRCode;
       _settings.enabledFrontCamera = enabledFrontCamera;
       _settings.durationNameDisplaying = durationNameDisplaying;
       _settings.audioSuccess = audioSuccess;
@@ -119,7 +123,7 @@ export default function Settings() {
 
   const handleLogout = () => {
     authClient.signOut();
-    router.push("/sign-in");
+    router.navigate("/sign-in");
     return;
   }
 
@@ -155,6 +159,25 @@ export default function Settings() {
           throw new Error(cards?.error);
         }
         updateAccessCards(db, cards);
+
+        const journeys = await getJourneys(db);
+        journeys.map(async (journey: any) => {
+          let shouldDelete: boolean = false;
+          try {
+            const result = await makeAuthenticatedRequest('journeys', journey.data, "POST");
+            if (result?.error) {
+              shouldDelete = false;
+            } else {
+              shouldDelete = true;
+              addLog(db, "sent journey", journey.data);
+            }
+          } catch(e: any) {
+            shouldDelete = false;
+          }
+          if (shouldDelete) {
+            await deleteJourney(db, journey.id);
+          }
+        });
         Alert.alert('Данные обновлены');
       } catch (error) {
           Alert.alert('ERROR', 'Невозможно обновить данные, попытайтесь позже', [{text: 'OK'}]);
@@ -178,6 +201,14 @@ export default function Settings() {
       <ThemedView style={styles.stepContainer}>
 
         <ThemedView style={styles.switchContainer}>
+          <ThemedText>Включить сканирование QR кода</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledQRCode}
+            onValueChange={(value) => setEnabledQRCode(value)}
+          />
+        </ThemedView>
+
+        <ThemedView style={styles.switchContainer}>
           <ThemedText>Использовать фронтальную камеру</ThemedText>
           <ThemedSwitch style={styles.switchElement}
             value={enabledFrontCamera}
@@ -192,7 +223,7 @@ export default function Settings() {
             onValueChange={(value) => setEnabledSoundSuccess(value)}
           />
         </ThemedView>
-        <ThemedText>Звук для успешного считывания пропуска - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
+        <ThemedText>Звук для успешного считывания - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
         <TouchableOpacity onPress={() => pickAudioSuccess()}>
           <ThemedText style={styles.redButton}>Выбрать</ThemedText>
         </TouchableOpacity>
@@ -276,7 +307,7 @@ const styles = StyleSheet.create({
     width: 346,
   },
   updateButton: {
-    marginTop: 75,
+    marginTop: 15,
   },
   switchContainer: {
     width: '100%',
