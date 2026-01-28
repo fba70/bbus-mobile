@@ -42,12 +42,12 @@ export default function Index() {
     setLoading(true);
     let settings: any =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
     let credentials = data.split('^');
-    setEmail(credentials[0]+"@bbus.ru");
+    setEmail(credentials[0]+"@"+process.env.EXPO_PUBLIC_EMAIL_DOMAIN);
     setPassword(credentials[1]);
 
     try {
       const result = await authClient.signIn.email({
-        email: `${credentials[0]}@bbus.ru`,
+        email: `${credentials[0]}@${process.env.EXPO_PUBLIC_EMAIL_DOMAIN}`,
         password: credentials[1],
       });
 
@@ -87,9 +87,9 @@ export default function Index() {
         Alert.alert("Ошибка входа: " + result.error.message);
       } else {
         if (settings != null) {
-          settings.vehicleNumber = email.replace("@bbus.ru", "");
+          settings.vehicleNumber = email.replace("@"+process.env.EXPO_PUBLIC_EMAIL_DOMAIN, "");
         } else {
-          settings = {"vehicleNumber": email.replace("@bbus.ru", "")};
+          settings = {"vehicleNumber": email.replace("@"+process.env.EXPO_PUBLIC_EMAIL_DOMAIN, "")};
         }
         SecureStore.setItem("settings", JSON.stringify(settings));
         router.push("/");
@@ -117,6 +117,7 @@ export default function Index() {
         source={require("@/assets/images/Logo_BBUS.webp")}
         style={styles.logo}
       />
+      <ThemedText style={styles.loginText}>Введите логин и пароль или наведите телефон на QR код</ThemedText>
       <ThemedView style={styles.stepContainer}>
         <ThemedTextInput
           placeholder="Е-майл"
@@ -145,7 +146,7 @@ export default function Index() {
 
         <ThemedView style={[styles.qrCodeContainer, {display: showQr? undefined: "none"}]}>
           <ThemedView style={{"height": "100%"}}>
-            <QrCamera onQrScanned={handleQrScanned} containerStyle={[{"position": "relative", bottom: 0}]} facing={"back"} />
+            <QrCamera onQrScanned={handleQrScanned} containerStyle={[{"position": "relative", bottom: 0}]} facing={"front"} />
             <TouchableOpacity style={[{"position": "absolute", top: 0, right: 6}]} onPress={() => setShowQr(false)}>
               <ThemedText style={styles.redButton}>Закрыть</ThemedText>
             </TouchableOpacity>
@@ -170,6 +171,10 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: 8,
     marginBottom: 8,
+  },
+  loginText: {
+    textAlign: 'center',
+    padding: 5
   },
   logo: {
     marginTop: 50,

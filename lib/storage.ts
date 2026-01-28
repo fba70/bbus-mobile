@@ -97,8 +97,8 @@ export const getNewRoutes = async(db: SQLite.SQLiteDatabase, sessionId: string |
     return routes;
 }
 
-export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: string | undefined) => {
-    const cards = await makeAuthenticatedRequest('access-cards?userId='+sessionId);
+export const getNewAccessCards = async (db: SQLite.SQLiteDatabase, sessionId: string | undefined, organizationId: string | undefined) => {
+    const cards = await makeAuthenticatedRequest('access-cards?userId='+sessionId+'&organizationId='+organizationId);
     if (cards?.error) {
         console.log(cards.error);
         return;

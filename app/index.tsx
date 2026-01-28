@@ -79,8 +79,6 @@ export default function Main() {
             //setConnected(false);
           }
 
-          getNewAccessCards(_db, session?.user.id);
-
           const sendPostponedJourneys = async () => {
             const journeys = await getJourneys(_db);
             journeys.map(async (journey: any) => {
@@ -121,6 +119,7 @@ export default function Main() {
             return;
           } else {
             setRoute(currentRoute[0]);
+            getNewAccessCards(_db, session?.user.id, currentRoute[0].organization.id);
           }
       } catch (error: any) {
           console.log("Error fetching data:", error);

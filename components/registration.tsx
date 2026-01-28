@@ -191,6 +191,8 @@ export default function Registration(props: any) {
                   :
                     ""
                 }
+              </ThemedView>
+              <ThemedView style={styles.passKeyBoxBottom} tabIndex={-1}>
                 <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.textPassengerName}>{passengerName ? passengerName: ""}</ThemedText>
               </ThemedView>
               { enabledQRCode ?
@@ -245,8 +247,26 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginLeft: 'auto',
     marginRight: 'auto',
+    borderBottomLeftRadius:0,
+    borderBottomRightRadius:0,
+    borderBottomWidth: 0,
     width: 300,
-    height: 400,
+    height: 350,
+    margin: 20,
+    marginTop: 0,
+    marginBottom: 0,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6'
+  },
+  passKeyBoxBottom: {
+    borderRadius: 20,
+    borderTopLeftRadius:0,
+    borderTopRightRadius:0,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 300,
+    height: 100,
     margin: 20,
     marginTop: 0,
     borderWidth: 3,
@@ -272,14 +292,14 @@ const styles = StyleSheet.create({
     objectFit: "contain"
   },
   textPassengerName: {
-    borderTopWidth: 1,
     borderColor: "#D1D5DC",
-    color: "#99A1AF",
     textAlign: "center",
     marginTop: 30,
     paddingTop: 20,
     textTransform: "uppercase",
     fontSize: 24,
+    backgroundColor: "#F3F4F6",
+    zIndex: 10,
   },
   cardFromKeyboard: {
     position: 'absolute',
