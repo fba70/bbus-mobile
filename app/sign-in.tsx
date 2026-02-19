@@ -138,7 +138,7 @@ export default function Index() {
           value={email}
           onChangeText={(value) => setEmail(value)}
         />
-{/*
+        {/*
         <TouchableOpacity onPress={() => openQrCodeCamera()}>
           <ThemedText style={styles.greenButton}>Сканировать</ThemedText>
         </TouchableOpacity>
@@ -170,7 +170,7 @@ export default function Index() {
             <QrCamera
               onQrScanned={handleQrScanned}
               containerStyle={[{ position: "relative", bottom: 0 }]}
-              facing={"back"}
+              facing={"front"}
             />
             <TouchableOpacity
               style={[{ position: "absolute", top: 0, right: 6 }]}
