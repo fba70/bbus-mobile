@@ -1,15 +1,18 @@
-
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { authClient } from "@/lib/auth-client";
 import { registerBackgroundTaskAsync } from "@/lib/cron";
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity } from "react-native";
-import 'react-native-reanimated';
+import "react-native-reanimated";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -22,33 +25,35 @@ export default function RootLayout() {
       setInitialized(true);
       try {
         await authClient.getSession();
-      } catch(e: any) {
-        console.log('Error loading session:', e.message);
+      } catch (e: any) {
+        console.log("Error loading session:", e.message);
         setConnected(false);
       }
-    }
+    };
     loadSession();
   }, [initialized]);
-  
+
   const handleReload = () => {
     router.replace("/");
-  }
+  };
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {connected === false ?
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      {connected === false ? (
         <ThemedView style={styles.globalContainer}>
           <ThemedView style={styles.textContainer}>
             <TouchableOpacity onPress={() => handleReload()}>
-              <ThemedText style={styles.redButton}>Нет сети. Перезагрузить</ThemedText>
+              <ThemedText style={styles.redButton}>
+                Нет сети. Перезагрузить
+              </ThemedText>
             </TouchableOpacity>
           </ThemedView>
         </ThemedView>
-      : 
+      ) : (
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
         </Stack>
-      }
+      )}
       <StatusBar style="auto" />
     </ThemeProvider>
   );
@@ -56,13 +61,13 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   globalContainer: {
-    height: '100%',
-    width: '100%',
+    height: "100%",
+    width: "100%",
   },
   textContainer: {
-    top: '50%',
-    width: '100%',
-    position: 'absolute',
+    top: "50%",
+    width: "100%",
+    position: "absolute",
   },
   redButton: {
     backgroundColor: "#DC2626",
@@ -70,9 +75,9 @@ const styles = StyleSheet.create({
     padding: 10,
     fontWeight: 300,
     textAlign: "center",
-    color: 'white',
+    color: "white",
     marginLeft: "auto",
     marginRight: "auto",
-    width: "80%"
+    width: "80%",
   },
 });
