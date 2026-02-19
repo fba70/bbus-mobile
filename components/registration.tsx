@@ -1,31 +1,36 @@
 import QrCamera from '@/components/qrCamera';
+import { ThemedTextInput } from '@/components/themed-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { getCardById, postponeJourney } from "@/lib/storage";
+import { addLog, getCardById, postponeJourney } from "@/lib/storage";
+import { debounce } from "@/lib/utils";
 import { useAudioPlayer } from 'expo-audio';
 import { Image } from "expo-image";
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from 'react';
-import { Alert, Button, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, StyleSheet, TouchableOpacity } from 'react-native';
 import 'react-native-reanimated';
 
 export default function Registration(props: any) {
     const { data: session } = authClient.useSession();
-    const [passKeyBoxColor, setPassKeyBoxColor] = useState('grey');
+    const [passKeyBoxColor, setPassKeyBoxColor] = useState('#F3F4F6');
     const [initialized, setInitialized] = useState(false);
-    const [enabledSound, setEnabledSound] = useState(true);
+    const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
+    const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
+    const [enabledQRCode, setEnabledQRCode] = useState(false);
     const [audioSuccess, setAudioSuccess] = useState(undefined);
-    const [audioInvalid, setAudioInvalid] = useState(undefined);
+    const [passengerName, setPassengerName] = useState("");
     const [showQr, setShowQr] = useState(false);
-    const [handlingQr, setHandlingQr] = useState(false);
+    const [handlingCard, setHandlingCard] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [lastConnectedTime, setLastConnectedTime] = useState("");
-    let audioSuccessPlayer = useAudioPlayer(audioSuccess);
-  
+    let audioSuccessPlayer = useAudioPlayer(audioSuccess === undefined ? require("@/assets/audios/crystalring.mp3") : audioSuccess);
+    const inputRef = useRef(ThemedTextInput);
+
     useEffect(() => {
       const loadSettings = async () => {
         if (initialized) return;
@@ -33,9 +38,10 @@ export default function Registration(props: any) {
         try {
             const settings = JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
             if (settings != null) {
-              setEnabledSound(settings.enabledSound);
+              setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : true);
               setAudioSuccess(settings.audioSuccess);
-              setAudioInvalid(settings.audioInvalid);
+              setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : true);
+              setEnabledQRCode(settings.enabledQRCode !== undefined ? settings.enabledQRCode : false);
             }
         } catch(e: any) {
           console.log(e);
@@ -47,12 +53,11 @@ export default function Registration(props: any) {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert('Необходимо разрешить геолокации на устройстве');
-          router.push("/main");
+          router.push("/");
           return;
         }
 
-        let location = await Location.getCurrentPositionAsync({});
-        setLocation(location);
+        setLocation(await Location.getCurrentPositionAsync({}));
       }
       getCurrentLocation();
 
@@ -63,17 +68,38 @@ export default function Registration(props: any) {
       }
 
       getLastConnectedTime();
-    }, [audioInvalid, audioSuccess, initialized, lastConnectedTime]);
+
+    }, [audioSuccess, enabledFrontCamera, initialized, lastConnectedTime]);
 
     const handleQrScanned = async (data: any) => {
-      if (handlingQr) return;
-      setHandlingQr(true);
-      
+      if (handlingCard) return;
+      setHandlingCard(true);
+      setPassengerName(data);
+      setTimeout(() => {
+        setPassengerName("");
+      }, 500);
+      handleCard(data, "QR_CODE");
+    };
+
+    const handleCardFromKeyboard = async (data: any) => {
+      setTimeout(() => {
+        setPassengerName("");
+        inputRef.current.clear();
+      }, 500);
+      if (handlingCard) return;
+      setHandlingCard(true);
+      setPassengerName(data);
+      handleCard(data, "RFID");
+    }
+
+    const handleCard = async (cardId: string, cardType: string) => {
       const settings: any = await SecureStore.getItemAsync("settings");
 
+      addLog(props.db, "handle card by registration mode", JSON.stringify({cardId, cardType}));
+
       if (settings == null || !(JSON.parse(settings).applicationId)) {
-        Alert.alert("Настройки не найдены. Перейдите в настройки и заполните их.");
-        router.push("/main");
+        Alert.alert("Настройки не найдены. Обновление данных.");
+        router.push("/");
         return;
       }
 
@@ -87,11 +113,11 @@ export default function Registration(props: any) {
                           applicationId: (JSON.parse(settings).applicationId)
                         } as any;
 
-      const сard: any = await getCardById(props.db, data);
+      const сard: any = await getCardById(props.db, cardId, props.route.organization.id);
       if (сard == null) {
         journey.accessCardId = "acebbd7a-e282-4aeb-8631-c49e93d230a1";
-        journey.newCardId = data;
-        journey.newCardType = "QR_CODE" //"NFC", "RFID", "QR_CODE")
+        journey.newCardId = cardId;
+        journey.newCardType = cardType; //"NFC", "RFID", "QR_CODE")
       } else {
         journey.accessCardId = сard.id;
       }
@@ -100,6 +126,8 @@ export default function Registration(props: any) {
         const result = await makeAuthenticatedRequest('journeys', JSON.stringify(journey), "POST");
         if (result?.error) {
           postponeJourney(props.db, journey);
+        } else {
+          addLog(props.db, "sent journey registration", JSON.stringify(journey));
         }
       } catch(e: any) {
         postponeJourney(props.db, journey);
@@ -107,15 +135,15 @@ export default function Registration(props: any) {
 
       setPassKeyBoxColor('green');
       setTimeout(() => {
-        setPassKeyBoxColor('grey');
-        setHandlingQr(false);
+        setPassKeyBoxColor('#F3F4F6');
+        setHandlingCard(false);
       }, 1000);
-      if (enabledSound) {
+      if (enabledSoundSuccess) {
         audioSuccessPlayer.play();
         setTimeout(() => {
           audioSuccessPlayer.pause();
           audioSuccessPlayer.seekTo(0);
-        }, 1000);
+        }, 3000);
       }
     }
 
@@ -135,35 +163,71 @@ export default function Registration(props: any) {
       }
     }
 
-    return <ThemedView style={styles.globalContainer}>
-              <ThemedView style={styles.clientHeader}>
-                <ThemedText style={styles.textContainer}>{props.route.organization.name}</ThemedText>
-                <ThemedText style={styles.textContainer}>{props.route.routeName}</ThemedText>
+    return <ThemedView style={styles.globalContainer} tabIndex={-1}>
+              <ThemedTextInput ref={inputRef} tabIndex={0} autoFocus={true} showSoftInputOnFocus={false} accessible={false}
+                onChangeText={debounce((value: string) => {handleCardFromKeyboard(value)}, 100)}
+                style={styles.cardFromKeyboard} onBlur={() => { Keyboard.dismiss(); inputRef.current.focus(); }} />
+              <ThemedView style={styles.clientHeader} tabIndex={-1}>
+                <ThemedText style={styles.textContainerBold}>{props.route.organization.name}</ThemedText>
+                <ThemedText style={[styles.textContainerBold, {color: '#6A7282'}]}>{props.route.routeName}</ThemedText>
               </ThemedView>
-              {showQr === false ? 
-                <ThemedView style={[{backgroundColor: passKeyBoxColor}, styles.passKeyBox]}>
-                  <ThemedText style={styles.attachPasskey}>Приложите пропуск</ThemedText>
-                  {logo !== "" 
-                  ?
-                      <Image source={`data:${signature};base64,${logo}`} style={styles.logo}/>
+              <ThemedView style={[styles.passKeyBox, {backgroundColor: passKeyBoxColor}]} tabIndex={-1}>
+                {showQr === false ? 
+                  <ThemedView style={{backgroundColor: "transparent"}}>
+                    <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.attachPasskey}>Приложите карту к считывателю {enabledQRCode ? "или покажите QR код": ""}</ThemedText>
+                    {logo !== "" 
+                    ?
+                        <Image source={`data:${signature};base64,${logo}`} contentFit='contain' style={styles.logo}/>
+                    :
+                        <Image source={require("@/assets/images/Logo_BBUS.webp")} style={styles.logo}/>
+                    }
+                  </ThemedView>
+                : 
+                  null
+                }
+                {
+                  enabledQRCode ? 
+                    <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={enabledFrontCamera ? "front": "back"} />
                   :
-                      <Image source={require("@/assets/images/Logo_BBUS.webp")} style={styles.logo}/>
-                  }
-                </ThemedView>
-              : 
-                null
+                    ""
+                }
+              </ThemedView>
+              <ThemedView style={styles.passKeyBoxBottom} tabIndex={-1}>
+                <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.textPassengerName}>{passengerName ? passengerName: ""}</ThemedText>
+              </ThemedView>
+              { enabledQRCode ?
+                  <ThemedView tabIndex={-1}>
+                    <TouchableOpacity onPress={() => setShowQr(!showQr)}>
+                      <ThemedText style={styles.greyButton}>{`${!showQr ? "Показать" : "Скрыть"} картинку для QR`}</ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
+                :
+                  ""
               }
-              <QrCamera onQrScanned={handleQrScanned} containerStyle={[styles.container, {display: showQr? "block": "none"}]} facing={"back"} />
-              {<Button title={`${!showQr ? "Показать" : "Скрыть"} видео с камеры для Qr кода`} onPress={() => setShowQr(!showQr)} ></Button>}
-
-              <ThemedText style={styles.textContainer}>Режим работы: Регистрация.</ThemedText>
-              <ThemedText style={styles.textContainer}>Обмен с сервером: {lastConnectedTime}</ThemedText>
+              <ThemedText style={styles.bottomText}>{session?.user.name}</ThemedText>
             </ThemedView>
 }
+
+//<ThemedText style={styles.textContainer}>Режим работы: Регистрация.</ThemedText>
+//<ThemedText style={styles.textContainer}>Обмен с сервером: {lastConnectedTime}</ThemedText>
 
 const styles = StyleSheet.create({
   textContainer: {
     textAlign: 'center',
+    fontSize: 20,
+    marginBottom: 8,
+  },
+  textContainerBold: {
+    textAlign: 'center',
+    fontSize: 24,
+    marginBottom: 8,
+    textTransform: "uppercase"
+  },
+  hotpot: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 100,
+    height: 100,
   },
   globalContainer: {
     height: '100%',
@@ -171,28 +235,48 @@ const styles = StyleSheet.create({
   },
   clientHeader: {
     padding: 20,
-    borderColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 10,
-    borderWidth: 1,
     margin: 10
   },
   attachPasskey: {
-    marginTop: 20,
+    marginTop: 10,
     fontSize: 20,
-    textAlign: 'center'
+    textAlign: 'center',
+    color: '#4A5565'
   },
   passKeyBox: {
     borderRadius: 20,
     marginLeft: 'auto',
     marginRight: 'auto',
+    borderBottomLeftRadius:0,
+    borderBottomRightRadius:0,
+    borderBottomWidth: 0,
     width: 300,
-    height: 400,
+    height: 350,
     margin: 20,
+    marginTop: 0,
+    marginBottom: 0,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6'
+  },
+  passKeyBoxBottom: {
+    borderRadius: 20,
+    borderTopLeftRadius:0,
+    borderTopRightRadius:0,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 300,
+    height: 100,
+    margin: 20,
+    marginTop: 0,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6'
   },
   container: {
     top: 0,
     position: 'relative',
-    height: 400,
+    height: 270,
     marginTop: 30,
     width: '100%',
   },
@@ -202,5 +286,39 @@ const styles = StyleSheet.create({
     marginRight: 'auto',
     width: 200,
     height: 200,
+    borderWidth: 0,
+    borderRadius: 10,
+    borderColor: '#D1D5DC',
+    objectFit: "contain"
+  },
+  textPassengerName: {
+    borderColor: "#D1D5DC",
+    textAlign: "center",
+    marginTop: 30,
+    paddingTop: 20,
+    textTransform: "uppercase",
+    fontSize: 24,
+    backgroundColor: "#F3F4F6",
+    zIndex: 10,
+  },
+  cardFromKeyboard: {
+    position: 'absolute',
+    left: -1000
+  },
+  greyButton: {
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 10,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    width: 300,
+    fontWeight: 300,
+    textAlign: "center",
+    color: '#000000'
+  },
+  bottomText: {
+    marginTop: 50,
+    textAlign: "center",
+    width: "100%",
   }
 });

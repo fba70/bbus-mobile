@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function QrCamera(props: { onQrScanned: (arg0: string) => void; containerStyle?: any; facing?: any;}) {
@@ -13,7 +13,6 @@ export default function QrCamera(props: { onQrScanned: (arg0: string) => void; c
 
   return (
     <ThemedView style={[{ paddingTop: insets.top, ...styleSheet.container }, props.containerStyle]}>
-
       {isPermissionGranted ? 
         <CameraView
             style={styleSheet.camStyle}
@@ -31,9 +30,9 @@ export default function QrCamera(props: { onQrScanned: (arg0: string) => void; c
             }
         />
         :
-        <Pressable style={[styleSheet.mainBtn, styleSheet.btnGreen]} onPress={requestPermission}>
-          <ThemedText>Разрешить снимать</ThemedText>
-        </Pressable>
+        <TouchableOpacity onPress={() => requestPermission()}>
+          <ThemedText style={[styleSheet.mainBtn, styleSheet.redButton]}>Разрешить снимать</ThemedText>
+        </TouchableOpacity>
       }
     </ThemedView>
   );
@@ -49,11 +48,15 @@ const styleSheet = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  btnGreen: {
-    backgroundColor: "#0BCD4C",
-  },
-  btnYellow: {
-    backgroundColor: "yellow",
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    marginLeft: 20,
+    marginRight: 20,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
   },
   camStyle: {
     position: 'absolute',

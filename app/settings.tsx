@@ -4,17 +4,19 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { authClient } from "@/lib/auth-client";
 import { makeAuthenticatedRequest } from '@/lib/request';
-import { initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
+import { addLog, clearLog, deleteJourney, getJourneys, getLog, initDb, updateAccessCards, updateBuses, updateRoutes } from '@/lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { Alert, Button, StyleSheet } from "react-native";
+import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 
 export default function Settings() {
-  const [vehicleNumber, setVehicleNumber] = useState("");
-  const [enabledSound, setEnabledSound] = useState(false);
+  const [enabledSoundSuccess, setEnabledSoundSuccess] = useState(true);
+  const [enabledSoundInvalid, setEnabledSoundInvalid] = useState(true);
+  const [enabledQRCode, setEnabledQRCode] = useState(false);
+  const [enabledFrontCamera, setEnabledFrontCamera] = useState(true);
   const [durationNameDisplaying, setDurationNameDisplaying] = useState(5);
   const [audioSuccess, setAudioSuccess] = useState<DocumentPicker.DocumentPickerAsset>();
   const [audioInvalid, setAudioInvalid] = useState<DocumentPicker.DocumentPickerAsset>();
@@ -29,14 +31,17 @@ export default function Settings() {
       title: 'Настройки',
     });
 
+    if (session == null) return;
     const loadSettings = async () => {
       if (initialized) return;
       const _db = await initDb();
       setDb(_db);
       const settings =  JSON.parse(await SecureStore.getItemAsync("settings") as unknown as string);
       if (settings != null) {
-        setVehicleNumber(settings.vehicleNumber || vehicleNumber);
-        setEnabledSound(settings.enabledSound || enabledSound);
+        setEnabledSoundSuccess(settings.enabledSoundSuccess !== undefined ? settings.enabledSoundSuccess : enabledSoundSuccess);
+        setEnabledSoundInvalid(settings.enabledSoundInvalid !== undefined ? settings.enabledSoundInvalid : enabledSoundInvalid);
+        setEnabledQRCode(settings.enabledQRCode !== undefined ? settings.enabledQRCode : enabledQRCode);
+        setEnabledFrontCamera(settings.enabledFrontCamera !== undefined ? settings.enabledFrontCamera : enabledFrontCamera);
         setDurationNameDisplaying(settings.durationNameDisplaying || durationNameDisplaying);
         setAudioSuccess(settings.audioSuccess || audioSuccess);
         setAudioInvalid(settings.audioInvalid || audioInvalid);
@@ -44,7 +49,9 @@ export default function Settings() {
       setInitialized(true);
     }
     loadSettings();
-  }, [audioInvalid, audioSuccess, durationNameDisplaying, enabledSound, initialized, navigation, vehicleNumber]);
+
+  }, [audioInvalid, audioSuccess, db, durationNameDisplaying, enabledFrontCamera, enabledQRCode, enabledSoundInvalid, enabledSoundSuccess,
+      initialized, navigation, session]);
 
   const pickAudioSuccess = async () => {
     try {
@@ -63,6 +70,7 @@ export default function Settings() {
         }
       } else {
         console.log("Audio selection cancelled.");
+        setAudioSuccess(undefined);
       }
     } catch (error) {
       console.log("Error picking audio:", error);
@@ -87,16 +95,45 @@ export default function Settings() {
         }
       } else {
         console.log("Audio selection cancelled.");
+        setAudioInvalid(undefined);
       }
     } catch (error) {
       console.log("Error picking audio:", error);
     }
   };
 
-  const handleSave = () => {
-    SecureStore.setItemAsync("settings", JSON.stringify({vehicleNumber, enabledSound, durationNameDisplaying, audioSuccess, audioInvalid}));
-    router.push('/main');
+  const handleSave = async () => {
+    const settings: any = await SecureStore.getItemAsync("settings");
+    if (settings == null) {
+      SecureStore.setItem("settings", JSON.stringify({enabledSoundSuccess, enabledQRCode, enabledSoundInvalid, enabledFrontCamera, durationNameDisplaying, audioSuccess, audioInvalid}));
+    } else {
+      const _settings = JSON.parse(settings);
+      _settings.enabledSoundSuccess = enabledSoundSuccess;
+      _settings.enabledSoundInvalid = enabledSoundInvalid;
+      _settings.enabledQRCode = enabledQRCode;
+      _settings.enabledFrontCamera = enabledFrontCamera;
+      _settings.durationNameDisplaying = durationNameDisplaying;
+      _settings.audioSuccess = audioSuccess;
+      _settings.audioInvalid = audioInvalid;
+      SecureStore.setItem("settings", JSON.stringify(_settings));
+    }
+    router.push("/");
     return;
+  }
+
+  const handleLogout = () => {
+    authClient.signOut();
+    router.navigate("/sign-in");
+    return;
+  }
+
+  const handleLog = async () => {
+    const records: any = await getLog(db);
+    let rows: any = [];
+    for (let i in records) {
+      rows.push(JSON.stringify(records[i]));
+    }
+    Alert.alert("Log", rows.join(`\n\r\n\r`), [{ 'text': 'Очистить', onPress: () => {clearLog(db)} }, { 'text': 'Закрыть'}]);
   }
 
   const handleUpdateData = () => {
@@ -122,6 +159,25 @@ export default function Settings() {
           throw new Error(cards?.error);
         }
         updateAccessCards(db, cards);
+
+        const journeys = await getJourneys(db);
+        journeys.map(async (journey: any) => {
+          let shouldDelete: boolean = false;
+          try {
+            const result = await makeAuthenticatedRequest('journeys', journey.data, "POST");
+            if (result?.error) {
+              shouldDelete = false;
+            } else {
+              shouldDelete = true;
+              addLog(db, "sent journey", journey.data);
+            }
+          } catch(e: any) {
+            shouldDelete = false;
+          }
+          if (shouldDelete) {
+            await deleteJourney(db, journey.id);
+          }
+        });
         Alert.alert('Данные обновлены');
       } catch (error) {
           Alert.alert('ERROR', 'Невозможно обновить данные, попытайтесь позже', [{text: 'OK'}]);
@@ -136,29 +192,53 @@ export default function Settings() {
     return;
   }
 
+  if (session == null) {
+    return <Redirect href="/sign-in" />;
+  }
+
   return (
     <ThemedView style={styles.globalContainer}>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText>Номер ТС</ThemedText>
-        <ThemedTextInput
-          placeholder="Формат AA(777)(777) или А(777)АА(777)"
-          defaultValue={vehicleNumber}
-          onChangeText={(value) => setVehicleNumber(value)}
-        />
 
-        <ThemedView style={styles.soundSwitchConteiner}>
-          <ThemedText>Включить звуковые сигналы</ThemedText>
-          <ThemedSwitch style={styles.soundSwitch}
-            value={enabledSound}
-            onValueChange={(value) => setEnabledSound(value)}
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Включить сканирование QR кода</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledQRCode}
+            onValueChange={(value) => setEnabledQRCode(value)}
           />
         </ThemedView>
 
-        <ThemedText>Звук для успешного считывания пропуска - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
-        <Button title="Выбрать" onPress={() => pickAudioSuccess()} />
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Использовать фронтальную камеру</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledFrontCamera}
+            onValueChange={(value) => setEnabledFrontCamera(value)}
+          />
+        </ThemedView>
 
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Включить сигнал на считывание</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledSoundSuccess}
+            onValueChange={(value) => setEnabledSoundSuccess(value)}
+          />
+        </ThemedView>
+        <ThemedText>Звук для успешного считывания - {audioSuccess? audioSuccess.name: 'Не выбрано'}</ThemedText>
+        <TouchableOpacity onPress={() => pickAudioSuccess()}>
+          <ThemedText style={styles.redButton}>Выбрать</ThemedText>
+        </TouchableOpacity>
+
+        <ThemedView style={styles.switchContainer}>
+          <ThemedText>Вкл. сигнал для невалид. пропуска</ThemedText>
+          <ThemedSwitch style={styles.switchElement}
+            value={enabledSoundInvalid}
+            onValueChange={(value) => setEnabledSoundInvalid(value)}
+          />
+        </ThemedView>
         <ThemedText>Звук для невалидного пропуска - {audioInvalid? audioInvalid.name: 'Не выбрано'}</ThemedText>
-        <Button title="Выбрать" onPress={() => pickAudioInvalid()} />
+        <TouchableOpacity onPress={() => pickAudioInvalid()}>
+          <ThemedText style={styles.redButton}>Выбрать</ThemedText>
+        </TouchableOpacity>
 
         <ThemedText>Время отображения ФИО сотрудника</ThemedText>
         <ThemedTextInput
@@ -168,7 +248,23 @@ export default function Settings() {
         />
 
         <ThemedView style={styles.saveButton}>
-          <Button title="Сохранить" onPress={() => handleSave()} />
+          <TouchableOpacity onPress={() => handleSave()}>
+            <ThemedText style={styles.redButton}>Сохранить</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+
+        <ThemedView style={styles.buttons}>
+          <ThemedView style={styles.logoutButton}>
+            <TouchableOpacity onPress={() => handleLogout()}>
+              <ThemedText style={styles.redButton}>Выйти</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        
+          <ThemedView style={styles.logButton}>
+            <TouchableOpacity onPress={() => handleLog()}>
+              <ThemedText style={styles.redButton}>Показать лог</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
         </ThemedView>
 
         <ThemedView style={styles.updateButton}>
@@ -177,9 +273,12 @@ export default function Settings() {
             ?
               <ThemedText>Загрузка...</ThemedText>
             : 
-              <Button title="Обновить данные" onPress={() => handleUpdateData()} color="green" />
+            <TouchableOpacity onPress={() => handleUpdateData()}>
+              <ThemedText style={styles.greenButton}>Обновить данные</ThemedText>
+            </TouchableOpacity>
           }
         </ThemedView>
+
       </ThemedView>
     </ThemedView>
   );
@@ -208,20 +307,47 @@ const styles = StyleSheet.create({
     width: 346,
   },
   updateButton: {
-    marginTop: 75,
+    marginTop: 15,
   },
-  soundSwitchConteiner: {
+  switchContainer: {
     width: '100%',
     display: 'flex',
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: 10,
   },
-  soundSwitch: {
+  switchElement: {
     marginTop: -10,
     marginLeft: 'auto',
   },
+  buttons: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
   saveButton: {
     marginTop: 20,
+  },
+  logoutButton: {
+    marginTop: 20,
+  },
+  logButton: {
+    marginTop: 20,
+  },
+  redButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
+  },
+  greenButton: {
+    backgroundColor: "green",
+    borderRadius: 10,
+    padding: 10,
+    fontWeight: 300,
+    textAlign: "center",
+    color: 'white'
   }
 });
 
